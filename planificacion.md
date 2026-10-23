@@ -1643,7 +1643,8 @@ export default function TagInput({ label, value, onChange, prefix = '', placehol
   const [draft, setDraft] = useState('');
 
   function commit(raw: string) {
-    const items = raw.split(/[,\s]+/).map((s) => s.replace(/^#+/, '').trim()).filter(Boolean);
+    // Etiquetas: solo coma (admiten espacios, p. ej. "buenos aires"). Hashtags: coma o espacio.
+    const items = raw.split(prefix ? /[,\s]+/ : /,/).map((s) => s.replace(/^#+/, '').trim()).filter(Boolean);
     if (items.length) onChange([...new Set([...value, ...items])]);
     setDraft('');
   }

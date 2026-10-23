@@ -1,8 +1,12 @@
 ---
 import AdminLayout from '@/layouts/AdminLayout.astro';
-const user = Astro.locals.user!;
+import AdminDashboard from '@/components/admin/AdminDashboard';
+import { listPhotos } from '@/lib/photos/repository';
+import { toDTO } from '@/lib/photos/types';
+import { MAX_BYTES } from '@/lib/cloudinary';
+
+const { photos, nextCursor } = await listPhotos({ limit: 48 });
 ---
 <AdminLayout>
-  <h1 class="font-serif text-3xl">Hola, {user.name}</h1>
-  <p class="mt-2 text-stone-500">Sesión activa como {user.email}.</p>
+  <AdminDashboard client:load initialPhotos={photos.map((p) => toDTO(p))} initialCursor={nextCursor} maxBytes={MAX_BYTES} />
 </AdminLayout>

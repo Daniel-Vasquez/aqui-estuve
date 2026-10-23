@@ -13,7 +13,7 @@ export default function AdminPhotoCard({ photo, onEdit, onDelete }: {
           <h3 className="truncate font-medium">{photo.title}</h3>
           <p className="text-xs text-stone-500">
             {new Date(photo.createdAt).toLocaleDateString('es')} · ♥ {photo.likesCount}
-            {photo.category && <> · {photo.category}</>}
+            {photo.categories.length > 0 && <> · {photo.categories.join(', ')}</>}
           </p>
         </div>
         <div className="flex shrink-0 gap-2 text-sm">

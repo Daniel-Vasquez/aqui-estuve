@@ -7,7 +7,7 @@ import { photoCreateSchema } from '@/lib/photos/schema';
 import { createPhoto, findByPublicId, listPhotos } from '@/lib/photos/repository';
 import { toDTO } from '@/lib/photos/types';
 import { getClientIp, hashIp, likedSet } from '@/lib/likes';
-import { resolveCategory } from '@/lib/photos/category-repository';
+import { resolveCategories } from '@/lib/photos/category-repository';
 import { ALL_CATEGORIES_LABEL, sameCategory } from '@/lib/photos/categories';
 
 export const GET: APIRoute = async (ctx) => {
@@ -50,8 +50,8 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   try {
-    // Al final: una categoría nueva solo se registra si la publicación es válida.
-    parsed.data.category = await resolveCategory(parsed.data.category);
+    // Al final: las categorías nuevas solo se registran si la publicación es válida.
+    parsed.data.categories = await resolveCategories(parsed.data.categories);
     const photo = await createPhoto(parsed.data, image);
     return json({ photo: toDTO(photo) }, 201);
   } catch (err) {

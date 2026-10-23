@@ -8,7 +8,8 @@ async function main() {
     { key: { publicId: 1 }, name: 'publicId_unique', unique: true },
     { key: { tags: 1 }, name: 'tags' },
     { key: { hashtags: 1 }, name: 'hashtags' },
-    { key: { category: 1, createdAt: -1, _id: -1 }, name: 'category_createdAt' },
+    { key: { categories: 1, createdAt: -1, _id: -1 }, name: 'categories_createdAt' },
+    { key: { category: 1, createdAt: -1, _id: -1 }, name: 'category_createdAt' },   // formato antiguo
   ]);
   await db.collection('categories').createIndexes([
     { key: { key: 1 }, name: 'key_unique', unique: true },

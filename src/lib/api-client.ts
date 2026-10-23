@@ -17,7 +17,7 @@ export interface PhotoMetadata {
   hashtags: string[];
   location: { name: string; mapsUrl?: string; lat?: number; lng?: number } | null;
   device: PhotoDevice | null;
-  category: string | null;
+  categories: string[];
   createdAt: string; // ISO
 }
 

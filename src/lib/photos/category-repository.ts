@@ -1,6 +1,6 @@
 import { MongoServerError } from 'mongodb';
 import { db } from '../db';
-import { BASE_CATEGORIES, categoryKey, normalizeCategory } from './categories';
+import { BASE_CATEGORIES, categoryKey, dedupeCategories, normalizeCategory } from './categories';
 import { photosCol } from './repository';
 
 interface CategoryDoc {
@@ -13,14 +13,15 @@ const categoriesCol = () => db.collection<CategoryDoc>('categories');
 
 /** Base (en su orden) + personalizadas (alfabético). También recoge categorías ya usadas en fotos. */
 export async function listCategories(): Promise<string[]> {
-  const [custom, used] = await Promise.all([
+  const [custom, used, usedLegacy] = await Promise.all([
     categoriesCol().find({}, { projection: { name: 1 } }).toArray(),
-    photosCol().distinct('category'),
+    photosCol().distinct('categories'),   // array nuevo (distinct aplana los arrays)
+    photosCol().distinct('category'),     // campo antiguo
   ]);
 
   const seen = new Set<string>(BASE_CATEGORIES.map(categoryKey));
   const extra: string[] = [];
-  for (const name of [...custom.map((c) => c.name), ...used]) {
+  for (const name of [...custom.map((c) => c.name), ...used, ...usedLegacy]) {
     if (typeof name !== 'string' || !name) continue;
     const key = categoryKey(name);
     if (seen.has(key)) continue;
@@ -28,6 +29,12 @@ export async function listCategories(): Promise<string[]> {
     extra.push(name);
   }
   return [...BASE_CATEGORIES, ...extra.sort((a, b) => a.localeCompare(b, 'es'))];
+}
+
+/** Resuelve una lista ya validada (1–3): nombres canónicos, registrando los nuevos, sin duplicados. */
+export async function resolveCategories(list: string[]): Promise<string[]> {
+  const resolved = await Promise.all(list.map((c) => resolveCategory(c)));
+  return dedupeCategories(resolved);
 }
 
 /**

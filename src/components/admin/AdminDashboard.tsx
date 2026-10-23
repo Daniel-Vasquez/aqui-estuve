@@ -27,8 +27,8 @@ export default function AdminDashboard({ initialPhotos, initialCursor, initialCa
       return next.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     });
     // Una categoría recién creada pasa a estar disponible sin recargar.
-    const cat = saved.category;
-    if (cat && !categories.some((c) => sameCategory(c, cat))) setCategories((prev) => [...prev, cat]);
+    const fresh = saved.categories.filter((s) => !categories.some((c) => sameCategory(c, s)));
+    if (fresh.length) setCategories((prev) => [...prev, ...fresh]);
     setEditor(null);
     setNotice('Guardado ✔');
   }

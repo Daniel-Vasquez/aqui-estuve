@@ -20,18 +20,24 @@ export async function listPhotos({ limit = 24, cursor, category }: {
   category?: string | null;   // null/undefined = todas
 }) {
   const safeLimit = Math.min(Math.max(limit, 1), 60);
-  const filter: Filter<PhotoDoc> = category ? { category } : {};
+  // Condiciones combinadas con $and: el filtro de categoría y el cursor usan $or cada uno.
+  const conditions: Filter<PhotoDoc>[] = [];
+  // Array nuevo `categories` + campo antiguo `category` (publicaciones previas).
+  if (category) conditions.push({ $or: [{ categories: category }, { category }] });
 
   if (cursor) {
     const cursorId = parseObjectId(cursor);
     const ref = cursorId ? await photosCol().findOne({ _id: cursorId }, { projection: { createdAt: 1 } }) : null;
     if (ref) {
-      filter.$or = [
-        { createdAt: { $lt: ref.createdAt } },
-        { createdAt: ref.createdAt, _id: { $lt: ref._id } },
-      ];
+      conditions.push({
+        $or: [
+          { createdAt: { $lt: ref.createdAt } },
+          { createdAt: ref.createdAt, _id: { $lt: ref._id } },
+        ],
+      });
     }
   }
+  const filter: Filter<PhotoDoc> = conditions.length ? { $and: conditions } : {};
 
   const docs = await photosCol()
     .find(filter)
@@ -60,7 +66,7 @@ export async function createPhoto(input: PhotoCreateInput, image: CloudinaryImag
     hashtags: input.hashtags,
     location: input.location,
     device: input.device,
-    category: input.category,
+    categories: input.categories,
     imageUrl: image.secure_url,
     publicId: image.public_id,
     width: image.width,
@@ -78,7 +84,9 @@ export async function createPhoto(input: PhotoCreateInput, image: CloudinaryImag
 export async function updatePhoto(id: ObjectId, input: PhotoUpdateInput) {
   const $set: Partial<PhotoDoc> = { ...input, updatedAt: new Date() };
   if (input.title) $set.slug = buildSlug(input.title, id);
-  return photosCol().findOneAndUpdate({ _id: id }, { $set }, { returnDocument: 'after' });
+  // Al guardar el array nuevo se retira el campo antiguo de una sola categoría.
+  const update = input.categories ? { $set, $unset: { category: '' as const } } : { $set };
+  return photosCol().findOneAndUpdate({ _id: id }, update, { returnDocument: 'after' });
 }
 
 export async function deletePhotoDoc(id: ObjectId) {

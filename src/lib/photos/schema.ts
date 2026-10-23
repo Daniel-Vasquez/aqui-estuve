@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { PHOTO_DEVICES } from './types';
-import { ALL_CATEGORIES_LABEL, CATEGORY_MAX_LENGTH, sameCategory } from './categories';
+import {
+  ALL_CATEGORIES_LABEL,
+  CATEGORY_MAX_LENGTH,
+  MAX_CATEGORIES_PER_PHOTO,
+  dedupeCategories,
+  sameCategory,
+} from './categories';
 
 const dedupe = (arr: string[]) => [...new Set(arr)];
 
@@ -44,13 +50,21 @@ const base = {
   hashtags,
   location: locationSchema.nullable(),
   device: z.enum(PHOTO_DEVICES).nullable(),
-  category: z
-    .string()
-    .trim()
-    .min(1)
-    .max(CATEGORY_MAX_LENGTH)
-    .refine((c) => !sameCategory(c, ALL_CATEGORIES_LABEL), { message: `"${ALL_CATEGORIES_LABEL}" es un nombre reservado` })
-    .nullable(),
+  // Se limpian vacíos/duplicados ANTES de contar: ["Paisaje", " paisaje ", ""] → ["Paisaje"].
+  categories: z
+    .array(z.string())
+    .transform(dedupeCategories)
+    .pipe(
+      z
+        .array(
+          z
+            .string()
+            .max(CATEGORY_MAX_LENGTH)
+            .refine((c) => !sameCategory(c, ALL_CATEGORIES_LABEL), { message: `"${ALL_CATEGORIES_LABEL}" es un nombre reservado` }),
+        )
+        .min(1, { message: 'Elige al menos una categoría' })
+        .max(MAX_CATEGORIES_PER_PHOTO, { message: `Máximo ${MAX_CATEGORIES_PER_PHOTO} categorías` }),
+    ),
   createdAt: z.coerce.date(),
 };
 
@@ -62,7 +76,7 @@ export const photoCreateSchema = z.object({
   hashtags: base.hashtags.default([]),
   location: base.location.default(null),
   device: base.device.default(null),           // no obligatorio
-  category: base.category.default(null),       // no obligatorio; se resuelve/crea en el endpoint
+  categories: base.categories,                 // obligatorio (1–3); se resuelven/crean en el endpoint
   createdAt: base.createdAt.optional(),        // si falta → ahora
 });
 

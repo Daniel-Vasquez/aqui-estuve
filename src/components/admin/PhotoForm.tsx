@@ -4,7 +4,7 @@ import { ApiError, createPhoto, updatePhoto, type PhotoMetadata } from '@/lib/ap
 import { thumbUrl } from '@/lib/cloudinary-url';
 import DeviceIcon from '@/components/icons/DeviceIcon';
 import TagInput from './TagInput';
-import CategoryField from './CategoryField';
+import CategoryPicker from './CategoryPicker';
 
 const DEVICE_OPTIONS: { value: PhotoDevice | null; label: string }[] = [
   { value: null, label: 'Sin indicar' },
@@ -36,7 +36,7 @@ export default function PhotoForm({ photo, categories, maxBytes, onSaved, onCanc
   const [locName, setLocName] = useState(photo?.location?.name ?? '');
   const [mapsUrl, setMapsUrl] = useState(photo?.location?.mapsUrl ?? '');
   const [device, setDevice] = useState<PhotoDevice | null>(photo?.device ?? null);
-  const [category, setCategory] = useState<string | null>(photo?.category ?? null);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(photo?.categories ?? []);
   const [date, setDate] = useState(toLocalInput(photo?.createdAt ?? new Date().toISOString()));
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +55,7 @@ export default function PhotoForm({ photo, categories, maxBytes, onSaved, onCanc
     e.preventDefault();
     setError(null);
     if (!editing && !file) return setError('Selecciona una imagen');
+    if (selectedCategories.length === 0) return setError('Elige al menos una categoría');
 
     const metadata: PhotoMetadata = {
       title,
@@ -63,7 +64,7 @@ export default function PhotoForm({ photo, categories, maxBytes, onSaved, onCanc
       hashtags,
       location: locName.trim() ? { name: locName.trim(), ...(mapsUrl.trim() ? { mapsUrl: mapsUrl.trim() } : {}) } : null,
       device,
-      category: category?.trim() || null,
+      categories: selectedCategories,
       createdAt: new Date(date).toISOString(),
     };
 
@@ -109,7 +110,7 @@ export default function PhotoForm({ photo, categories, maxBytes, onSaved, onCanc
         <input required maxLength={140} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título" className={input} />
         <textarea rows={5} maxLength={5000} value={description} onChange={(e) => setDescription(e.target.value)}
           placeholder="La historia detrás de la foto…" className={input} />
-        <CategoryField categories={categories} value={category} onChange={setCategory} className={input} />
+        <CategoryPicker categories={categories} value={selectedCategories} onChange={setSelectedCategories} />
         <TagInput label="Etiquetas" value={tags} onChange={setTags} placeholder="viajes, montaña…" />
         <TagInput label="Hashtags" prefix="#" value={hashtags} onChange={setHashtags} placeholder="#atardecer" />
         <input value={locName} onChange={(e) => setLocName(e.target.value)} placeholder="Lugar (p. ej. Plaza de Armas, Cusco)" className={input} />

@@ -10,6 +10,7 @@ async function main() {
     { key: { hashtags: 1 }, name: 'hashtags' },
     { key: { categories: 1, createdAt: -1, _id: -1 }, name: 'categories_createdAt' },
     { key: { category: 1, createdAt: -1, _id: -1 }, name: 'category_createdAt' },   // formato antiguo
+    { key: { device: 1, createdAt: -1, _id: -1 }, name: 'device_createdAt' },
   ]);
   await db.collection('categories').createIndexes([
     { key: { key: 1 }, name: 'key_unique', unique: true },

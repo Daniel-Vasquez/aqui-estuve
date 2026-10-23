@@ -80,10 +80,19 @@ export const updatePhoto = (id: string, patch: Partial<PhotoMetadata>) =>
 export const deletePhoto = (id: string) =>
   fetch(`/api/photos/${id}`, { method: 'DELETE' }).then((r) => handle<{ ok: true }>(r));
 
-export async function fetchPhotos(cursor?: string | null, limit = 24, category?: string | null, signal?: AbortSignal) {
+export interface PhotoQuery {
+  cursor?: string | null;
+  limit?: number;
+  category?: string | null;
+  device?: PhotoDevice | null;
+  signal?: AbortSignal;
+}
+
+export async function fetchPhotos({ cursor, limit = 24, category, device, signal }: PhotoQuery = {}) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (cursor) params.set('cursor', cursor);
   if (category) params.set('category', category);
+  if (device) params.set('device', device);
   const res = await fetch(`/api/photos?${params}`, { signal });
   return handle<{ photos: PhotoDTO[]; nextCursor: string | null }>(res);
 }

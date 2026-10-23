@@ -1,19 +1,21 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Gallery from '@/components/gallery/Gallery';
-import { getPhoto, listPhotos, parseObjectId } from '@/lib/photos/repository';
+import { getPhoto, isPhotoDevice, listDevices, listPhotos, parseObjectId } from '@/lib/photos/repository';
 import { listCategories } from '@/lib/photos/category-repository';
 import { sameCategory } from '@/lib/photos/categories';
 import { toDTO } from '@/lib/photos/types';
 import { getClientIp, hashIp, likedSet } from '@/lib/likes';
 import { ogImageUrl } from '@/lib/cloudinary-url';
 
-// Filtro compartible /?categoria=Paisaje (se normaliza a la forma canónica; si no existe, se ignora).
-const categories = await listCategories();
+// Filtros compartibles /?categoria=Paisaje&dispositivo=camera (valores desconocidos se ignoran).
+const [categories, devices] = await Promise.all([listCategories(), listDevices()]);
 const rawCategory = Astro.url.searchParams.get('categoria');
 const category = rawCategory ? categories.find((c) => sameCategory(c, rawCategory)) ?? null : null;
+const rawDevice = Astro.url.searchParams.get('dispositivo');
+const device = isPhotoDevice(rawDevice) ? rawDevice : null;
 
-const { photos, nextCursor } = await listPhotos({ limit: 30, category });
+const { photos, nextCursor } = await listPhotos({ limit: 30, category, device });
 
 // Enlace compartido /?foto=<id>: si no está en la primera página, se antepone.
 const sharedId = parseObjectId(Astro.url.searchParams.get('foto') ?? undefined);
@@ -33,5 +35,5 @@ const dtos = photos.map((p) => toDTO(p, liked.has(p._id.toHexString())));
   image={shared ? ogImageUrl(shared.imageUrl) : photos[0] ? ogImageUrl(photos[0].imageUrl) : undefined}
 >
   <Gallery client:load initialPhotos={dtos} initialCursor={nextCursor} initialOpenId={shared?._id.toHexString() ?? null}
-    categories={categories} initialCategory={category} />
+    categories={categories} devices={devices} initialFilters={{ category, device }} />
 </BaseLayout>

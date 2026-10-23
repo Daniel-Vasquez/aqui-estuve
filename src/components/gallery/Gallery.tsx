@@ -1,31 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PhotoDTO } from '@/lib/photos/types';
-import { ALL_CATEGORIES_LABEL } from '@/lib/photos/categories';
+import { DEVICE_LABEL, type PhotoDevice, type PhotoDTO } from '@/lib/photos/types';
 import { fetchPhotos } from '@/lib/api-client';
 import { useLikedPhotos } from '@/hooks/useLikedPhotos';
 import { isDesktop } from '@/lib/media';
 import PhotoCard from './PhotoCard';
 import PhotoSkeleton from './PhotoSkeleton';
-import CategoryFilter from './CategoryFilter';
+import FilterSelect from './FilterSelect';
 import Lightbox from './Lightbox';
 
 const PAGE_SIZE = 30;
 const SKELETONS = 6;
+
+interface Filters {
+  category: string | null;      // null = todas
+  device: PhotoDevice | null;   // null = todos
+}
+const NO_FILTERS: Filters = { category: null, device: null };
 
 interface Props {
   initialPhotos: PhotoDTO[];
   initialCursor: string | null;
   initialOpenId?: string | null;
   categories: string[];
-  initialCategory?: string | null;   // null = Todas
+  devices: PhotoDevice[];            // dispositivos con al menos una foto
+  initialFilters?: Filters;
 }
 
-export default function Gallery({ initialPhotos, initialCursor, initialOpenId = null, categories, initialCategory = null }: Props) {
+export default function Gallery({ initialPhotos, initialCursor, initialOpenId = null, categories, devices, initialFilters = NO_FILTERS }: Props) {
   const [photos, setPhotos] = useState(initialPhotos);
   const [cursor, setCursor] = useState(initialCursor);
   const [loading, setLoading] = useState(false);           // "Cargar más"
-  const [category, setCategory] = useState<string | null>(initialCategory);
-  const [filtering, setFiltering] = useState(false);       // cambio de categoría en curso
+  const [filters, setFilters] = useState<Filters>(initialFilters);
+  const [filtering, setFiltering] = useState(false);       // cambio de filtros en curso
   const [filterError, setFilterError] = useState(false);
   const [generation, setGeneration] = useState(0);         // >0 ⇒ las fotos vienen de un filtro → animar entrada
   const [openId, setOpenId] = useState<string | null>(initialOpenId);
@@ -45,20 +51,25 @@ export default function Gallery({ initialPhotos, initialCursor, initialOpenId = 
     document.getElementById(`foto-${initialOpenId}`)?.scrollIntoView({ block: 'start' });
   }, [initialOpenId]);
 
-  // URL compartible: /?foto=<id>&categoria=<nombre> (sin recargar)
+  // URL compartible: /?foto=<id>&categoria=<nombre>&dispositivo=<iphone|camera> (sin recargar)
   useEffect(() => {
     const url = new URL(window.location.href);
-    openId ? url.searchParams.set('foto', openId) : url.searchParams.delete('foto');
-    category ? url.searchParams.set('categoria', category) : url.searchParams.delete('categoria');
+    const set = (k: string, v: string | null) => (v ? url.searchParams.set(k, v) : url.searchParams.delete(k));
+    set('foto', openId);
+    set('categoria', filters.category);
+    set('dispositivo', filters.device);
     window.history.replaceState(null, '', url);
-  }, [openId, category]);
+  }, [openId, filters]);
+
+  const hasFilters = filters.category !== null || filters.device !== null;
 
   const index = photos.findIndex((p) => p.id === openId);
   const current = index >= 0 ? photos[index] : null;
 
-  async function changeCategory(next: string | null) {
-    if (next === category && !filterError) return;
-    setCategory(next);
+  /** Aplica filtros (uno, ambos o ninguno) con una sola petición. */
+  async function applyFilters(next: Filters) {
+    if (next.category === filters.category && next.device === filters.device && !filterError) return;
+    setFilters(next);
     setOpenId(null);
     setFilterError(false);
     setFiltering(true);
@@ -68,7 +79,7 @@ export default function Gallery({ initialPhotos, initialCursor, initialOpenId = 
     const controller = new AbortController();
     filterRequest.current = controller;
     try {
-      const { photos: list, nextCursor } = await fetchPhotos(null, PAGE_SIZE, next, controller.signal);
+      const { photos: list, nextCursor } = await fetchPhotos({ limit: PAGE_SIZE, ...next, signal: controller.signal });
       setPhotos(list);
       setCursor(nextCursor);
       syncFromServer(list);
@@ -85,7 +96,7 @@ export default function Gallery({ initialPhotos, initialCursor, initialOpenId = 
     if (!cursor || loading || filtering) return;
     setLoading(true);
     try {
-      const { photos: more, nextCursor } = await fetchPhotos(cursor, PAGE_SIZE, category);
+      const { photos: more, nextCursor } = await fetchPhotos({ cursor, limit: PAGE_SIZE, ...filters });
       setPhotos((prev) => [...prev, ...more]);
       setCursor(nextCursor);
       syncFromServer(more);
@@ -103,9 +114,19 @@ export default function Gallery({ initialPhotos, initialCursor, initialOpenId = 
 
   return (
     <>
-      {/* Debajo de la barra superior (título + tema), alineado a la derecha */}
-      <div className="mb-6 flex justify-end">
-        <CategoryFilter categories={categories} value={category} onChange={changeCategory} />
+      {/* Debajo de la barra superior (título + tema), a la derecha. Orden: Limpiar → Categoría → Dispositivo.
+          flex-wrap: en móvil estrecho pasa a dos líneas sin alterar el orden. */}
+      <div className="mb-6 flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+        <button type="button" disabled={!hasFilters} onClick={() => applyFilters(NO_FILTERS)}
+          className="cursor-pointer text-sm text-stone-700 transition-opacity hover:opacity-75 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-35 dark:text-stone-300">
+          Limpiar filtros
+        </button>
+        <FilterSelect label="Filtrar por categoría" allLabel="Categoría"
+          options={categories.map((c) => ({ value: c, label: c }))}
+          value={filters.category} onChange={(category) => applyFilters({ ...filters, category })} />
+        <FilterSelect label="Filtrar por dispositivo" allLabel="Dispositivo"
+          options={devices.map((d) => ({ value: d, label: DEVICE_LABEL[d] }))}
+          value={filters.device} onChange={(device) => applyFilters({ ...filters, device })} />
       </div>
 
       {filtering ? (
@@ -116,17 +137,19 @@ export default function Gallery({ initialPhotos, initialCursor, initialOpenId = 
       ) : filterError ? (
         <div className="py-24 text-center text-sm text-stone-500">
           <p>No se pudieron cargar las fotos.</p>
-          <button type="button" onClick={() => changeCategory(category)} className="mt-3 underline underline-offset-4">
+          <button type="button" onClick={() => applyFilters(filters)} className="mt-3 underline underline-offset-4">
             Reintentar
           </button>
         </div>
       ) : empty ? (
-        category ? (
+        hasFilters ? (
           <div className="py-24 text-center text-sm text-stone-500">
-            <p>Aún no hay fotos en «{category}».</p>
-            <button type="button" onClick={() => changeCategory(null)}
+            <p>No hay fotos con {filters.category && filters.device ? 'esa combinación' : 'ese filtro'}:{' '}
+              {[filters.category && `«${filters.category}»`, filters.device && DEVICE_LABEL[filters.device]].filter(Boolean).join(' · ')}.
+            </p>
+            <button type="button" onClick={() => applyFilters(NO_FILTERS)}
               className="mt-3 text-stone-900 underline underline-offset-4 dark:text-stone-100">
-              Ver {ALL_CATEGORIES_LABEL.toLowerCase()}
+              Limpiar filtros
             </button>
           </div>
         ) : (

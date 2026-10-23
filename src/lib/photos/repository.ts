@@ -2,7 +2,7 @@ import { ObjectId, type Filter } from 'mongodb';
 import type { CloudinaryImage } from '../cloudinary';
 import { db } from '../db';
 import { slugify } from '../slug';
-import type { PhotoDoc } from './types';
+import { PHOTO_DEVICES, type PhotoDevice, type PhotoDoc } from './types';
 import type { PhotoCreateInput, PhotoUpdateInput } from './schema';
 
 export const photosCol = () => db.collection<PhotoDoc>('photos');
@@ -14,16 +14,18 @@ export function parseObjectId(id: string | undefined): ObjectId | null {
 const buildSlug = (title: string, id: ObjectId) =>
   `${slugify(title) || 'foto'}-${id.toHexString().slice(-6)}`;
 
-export async function listPhotos({ limit = 24, cursor, category }: {
+export async function listPhotos({ limit = 24, cursor, category, device }: {
   limit?: number;
   cursor?: string | null;
-  category?: string | null;   // null/undefined = todas
+  category?: string | null;      // null/undefined = todas
+  device?: PhotoDevice | null;   // null/undefined = todos
 }) {
   const safeLimit = Math.min(Math.max(limit, 1), 60);
   // Condiciones combinadas con $and: el filtro de categoría y el cursor usan $or cada uno.
   const conditions: Filter<PhotoDoc>[] = [];
   // Array nuevo `categories` + campo antiguo `category` (publicaciones previas).
   if (category) conditions.push({ $or: [{ categories: category }, { category }] });
+  if (device) conditions.push({ device });
 
   if (cursor) {
     const cursorId = parseObjectId(cursor);
@@ -49,6 +51,15 @@ export async function listPhotos({ limit = 24, cursor, category }: {
   const page = hasMore ? docs.slice(0, safeLimit) : docs;
   return { photos: page, nextCursor: hasMore ? page[page.length - 1]._id.toHexString() : null };
 }
+
+/** Dispositivos que aparecen en al menos una publicación, en el orden del sistema (iPhone, Cámara). */
+export async function listDevices(): Promise<PhotoDevice[]> {
+  const used = new Set(await photosCol().distinct('device'));
+  return PHOTO_DEVICES.filter((d) => used.has(d));
+}
+
+export const isPhotoDevice = (v: unknown): v is PhotoDevice =>
+  typeof v === 'string' && (PHOTO_DEVICES as readonly string[]).includes(v);
 
 export const getPhoto = (id: ObjectId) => photosCol().findOne({ _id: id });
 

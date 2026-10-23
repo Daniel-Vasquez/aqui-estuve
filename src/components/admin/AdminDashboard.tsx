@@ -49,7 +49,7 @@ export default function AdminDashboard({ initialPhotos, initialCursor, initialCa
   }
 
   async function loadMore() {
-    const { photos: more, nextCursor } = await fetchPhotos(cursor);
+    const { photos: more, nextCursor } = await fetchPhotos({ cursor });
     setPhotos((prev) => [...prev, ...more]);
     setCursor(nextCursor);
   }

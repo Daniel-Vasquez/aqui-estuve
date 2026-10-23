@@ -4,7 +4,7 @@ import { MongoServerError } from 'mongodb';
 import { json, jsonError } from '@/lib/http';
 import { FOLDER, MAX_BYTES, destroyImage, getImage } from '@/lib/cloudinary';
 import { photoCreateSchema } from '@/lib/photos/schema';
-import { createPhoto, findByPublicId, listPhotos } from '@/lib/photos/repository';
+import { createPhoto, findByPublicId, isPhotoDevice, listPhotos } from '@/lib/photos/repository';
 import { toDTO } from '@/lib/photos/types';
 import { getClientIp, hashIp, likedSet } from '@/lib/likes';
 import { resolveCategories } from '@/lib/photos/category-repository';
@@ -16,7 +16,10 @@ export const GET: APIRoute = async (ctx) => {
   // ?category=Paisaje filtra; ausente o "Todas" → todas.
   const rawCategory = ctx.url.searchParams.get('category')?.trim();
   const category = rawCategory && !sameCategory(rawCategory, ALL_CATEGORIES_LABEL) ? rawCategory : null;
-  const { photos, nextCursor } = await listPhotos({ limit, cursor, category });
+  // ?device=iphone|camera filtra; ausente o desconocido → todos. Ambos params se combinan (AND).
+  const rawDevice = ctx.url.searchParams.get('device');
+  const device = isPhotoDevice(rawDevice) ? rawDevice : null;
+  const { photos, nextCursor } = await listPhotos({ limit, cursor, category, device });
   const ip = getClientIp(ctx);
   const liked = ip ? await likedSet(hashIp(ip), photos.map((p) => p._id)) : new Set<string>();
   return json({ photos: photos.map((p) => toDTO(p, liked.has(p._id.toHexString()))), nextCursor });

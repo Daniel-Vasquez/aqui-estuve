@@ -9,7 +9,11 @@ async function main() {
     { key: { tags: 1 }, name: 'tags' },
     { key: { hashtags: 1 }, name: 'hashtags' },
   ]);
-  // (Tanda 5 añade aquí los índices de `likes`)
+  const likes = db.collection('likes');
+  await likes.createIndexes([
+    { key: { photoId: 1, ipHash: 1 }, name: 'photo_ip_unique', unique: true },
+    { key: { ipHash: 1 }, name: 'ipHash' },
+  ]);
   console.log('✔ Índices creados');
 }
 

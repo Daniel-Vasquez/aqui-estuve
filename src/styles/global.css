@@ -9,6 +9,7 @@
 }
 
 @layer base {
-  html { @apply bg-stone-50 text-stone-900 antialiased; }
+  /* Reserva el hueco de la barra de scroll: al bloquearlo (modales) el fondo no se desplaza */
+  html { @apply bg-stone-50 text-stone-900 antialiased; scrollbar-gutter: stable; }
   html.dark { @apply bg-stone-950 text-stone-100; }
 }

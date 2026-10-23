@@ -6,12 +6,15 @@ import { FOLDER, MAX_BYTES, destroyImage, getImage } from '@/lib/cloudinary';
 import { photoCreateSchema } from '@/lib/photos/schema';
 import { createPhoto, findByPublicId, listPhotos } from '@/lib/photos/repository';
 import { toDTO } from '@/lib/photos/types';
+import { getClientIp, hashIp, likedSet } from '@/lib/likes';
 
-export const GET: APIRoute = async ({ url }) => {
-  const limit = Number(url.searchParams.get('limit') ?? 24) || 24;
-  const cursor = url.searchParams.get('cursor');
+export const GET: APIRoute = async (ctx) => {
+  const limit = Number(ctx.url.searchParams.get('limit') ?? 24) || 24;
+  const cursor = ctx.url.searchParams.get('cursor');
   const { photos, nextCursor } = await listPhotos({ limit, cursor });
-  return json({ photos: photos.map((p) => toDTO(p)), nextCursor });
+  const ip = getClientIp(ctx);
+  const liked = ip ? await likedSet(hashIp(ip), photos.map((p) => p._id)) : new Set<string>();
+  return json({ photos: photos.map((p) => toDTO(p, liked.has(p._id.toHexString()))), nextCursor });
 };
 
 // Protegido por middleware (solo admin). La imagen YA está en Cloudinary (subida directa).

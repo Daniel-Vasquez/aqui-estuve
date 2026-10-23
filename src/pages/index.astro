@@ -1,6 +1,29 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
+import Gallery from '@/components/gallery/Gallery';
+import { getPhoto, listPhotos, parseObjectId } from '@/lib/photos/repository';
+import { toDTO } from '@/lib/photos/types';
+import { getClientIp, hashIp, likedSet } from '@/lib/likes';
+import { ogImageUrl } from '@/lib/cloudinary-url';
+
+const { photos, nextCursor } = await listPhotos({ limit: 30 });
+
+// Enlace compartido /?foto=<id>: si no está en la primera página, se antepone.
+const sharedId = parseObjectId(Astro.url.searchParams.get('foto') ?? undefined);
+let shared = sharedId ? photos.find((p) => p._id.equals(sharedId)) ?? null : null;
+if (sharedId && !shared) {
+  shared = await getPhoto(sharedId);
+  if (shared) photos.unshift(shared);
+}
+
+const ip = getClientIp(Astro);
+const liked = ip ? await likedSet(hashIp(ip), photos.map((p) => p._id)) : new Set<string>();
+const dtos = photos.map((p) => toDTO(p, liked.has(p._id.toHexString())));
 ---
-<BaseLayout>
-  <p class="text-stone-500 dark:text-stone-400">La galería llegará en la Tanda 5.</p>
+<BaseLayout
+  title={shared ? `${shared.title} · Aquí Estuve` : 'Aquí Estuve'}
+  description={shared?.description?.slice(0, 160) || undefined}
+  image={shared ? ogImageUrl(shared.imageUrl) : photos[0] ? ogImageUrl(photos[0].imageUrl) : undefined}
+>
+  <Gallery client:load initialPhotos={dtos} initialCursor={nextCursor} initialOpenId={shared?._id.toHexString() ?? null} />
 </BaseLayout>

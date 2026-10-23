@@ -375,7 +375,8 @@ export const GET: APIRoute = async () => {
 }
 
 @layer base {
-  html { @apply bg-stone-50 text-stone-900 antialiased; }
+  /* Reserva el hueco de la barra de scroll: al bloquearlo (modales) el fondo no se desplaza */
+  html { @apply bg-stone-50 text-stone-900 antialiased; scrollbar-gutter: stable; }
   html.dark { @apply bg-stone-950 text-stone-100; }
 }
 ```
@@ -2026,6 +2027,8 @@ src/lib/likes.ts                       (crear)
 src/pages/api/photos/[id]/like.ts      (crear)
 src/pages/api/photos/index.ts          (modificar: likedByMe en GET)
 scripts/init-db.ts                     (modificar: índices de likes)
+scripts/recount-likes.ts               (crear: recalcula likesCount)
+package.json                           (script "db:recount-likes": "tsx --env-file=.env scripts/recount-likes.ts")
 src/hooks/useLikedPhotos.ts            (crear)
 src/components/gallery/LikeButton.tsx  (crear)
 src/components/gallery/LocationLink.tsx(crear)
@@ -2081,13 +2084,16 @@ export async function toggleLike(photoId: ObjectId, ipHash: string) {
     // 11000 = clave duplicada → ya había like de este hash → se quita.
     if (!(err instanceof MongoServerError && err.code === 11000)) throw err;
     const { deletedCount } = await likesCol().deleteOne({ photoId, ipHash });
+    // Sin condición ($gt: 0): cada alta suma 1 y cada baja resta 1, así el valor final
+    // siempre coincide con los documentos de `likes` aunque las peticiones se crucen.
+    // Un instante puede quedar en -1; la respuesta se acota a 0.
     const doc = deletedCount
       ? await photosCol().findOneAndUpdate(
-          { _id: photoId, likesCount: { $gt: 0 } }, { $inc: { likesCount: -1 } },
+          { _id: photoId }, { $inc: { likesCount: -1 } },
           { returnDocument: 'after', projection: { likesCount: 1 } },
         )
       : await photosCol().findOne({ _id: photoId }, { projection: { likesCount: 1 } });
-    return { liked: false, likesCount: doc?.likesCount ?? 0 };
+    return { liked: false, likesCount: Math.max(0, doc?.likesCount ?? 0) };
   }
 }
 
@@ -2260,11 +2266,11 @@ export default function PhotoCard({ photo, onOpen, eager }: { photo: PhotoDTO; o
 }
 ```
 
-**`src/components/gallery/Lightbox.tsx`**
+**`src/components/gallery/Lightbox.tsx`** — dimensiones fijas desde el primer frame (sin layout shift) + miniatura provisional con fundido.
 ```tsx
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PhotoDTO } from '@/lib/photos/types';
-import { downloadUrl, lightboxUrl } from '@/lib/cloudinary-url';
+import { downloadUrl, lightboxUrl, thumbUrl } from '@/lib/cloudinary-url';
 import Modal from '@/components/ui/Modal';
 import LikeButton from './LikeButton';
 import LocationLink from './LocationLink';
@@ -2279,6 +2285,11 @@ interface Props {
 }
 
 export default function Lightbox({ photo, liked, onClose, onPrev, onNext, onLikeChange }: Props) {
+  // id de la foto cuya imagen grande ya terminó de cargar (se reinicia sola al cambiar de foto).
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const loaded = photo !== null && loadedId === photo.id;
+
   useEffect(() => {
     if (!photo) return;
     const onKey = (e: KeyboardEvent) => {
@@ -2289,19 +2300,41 @@ export default function Lightbox({ photo, liked, onClose, onPrev, onNext, onLike
     return () => window.removeEventListener('keydown', onKey);
   }, [photo, onPrev, onNext]);
 
+  // Si la imagen ya estaba en caché puede completarse antes de enlazar onLoad.
+  useEffect(() => {
+    if (photo && imgRef.current?.complete) setLoadedId(photo.id);
+  }, [photo]);
+
   return (
     <Modal open={photo !== null} onClose={onClose} labelledBy="lightbox-title" className="max-h-dvh max-w-[100vw]">
       {photo && (
-        <div className="grid max-h-[95dvh] w-[min(1400px,96vw)] overflow-hidden rounded-2xl bg-white text-stone-900 lg:grid-cols-[1fr_380px] dark:bg-stone-900 dark:text-stone-100">
-          <div className="relative flex items-center justify-center bg-black">
-            <img key={photo.id} src={lightboxUrl(photo.imageUrl)} alt={photo.title}
-              width={photo.width} height={photo.height}
-              className="max-h-[60dvh] w-auto object-contain lg:max-h-[95dvh]" />
-            {onPrev && <button type="button" onClick={onPrev} aria-label="Anterior" className="absolute left-2 rounded-full bg-black/50 px-3 py-2 text-white">‹</button>}
-            {onNext && <button type="button" onClick={onNext} aria-label="Siguiente" className="absolute right-2 rounded-full bg-black/50 px-3 py-2 text-white">›</button>}
+        // Dimensiones FIJAS desde el primer frame: no dependen de la imagen ni de su carga.
+        // Móvil: filas 55dvh (imagen) + resto (info con scroll). Escritorio: columnas 1fr + 380px.
+        <div className="grid h-[92dvh] w-[min(1400px,96vw)] grid-rows-[55dvh_minmax(0,1fr)] overflow-hidden rounded-2xl bg-white text-stone-900 lg:h-[90dvh] lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-1 dark:bg-stone-900 dark:text-stone-100">
+          <div className="relative min-h-0 bg-black">
+            {/* Provisional: miniatura (normalmente en caché por la galería) */}
+            <img
+              key={`thumb-${photo.id}`}
+              src={thumbUrl(photo.imageUrl, 800)}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full object-contain"
+            />
+            <img
+              key={photo.id}
+              ref={imgRef}
+              src={lightboxUrl(photo.imageUrl)}
+              alt={photo.title}
+              width={photo.width}
+              height={photo.height}
+              onLoad={() => setLoadedId(photo.id)}
+              className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+            />
+            {onPrev && <button type="button" onClick={onPrev} aria-label="Anterior" className="absolute top-1/2 left-2 -translate-y-1/2 rounded-full bg-black/50 px-3 py-2 text-white">‹</button>}
+            {onNext && <button type="button" onClick={onNext} aria-label="Siguiente" className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-black/50 px-3 py-2 text-white">›</button>}
           </div>
 
-          <aside className="flex flex-col gap-4 overflow-y-auto p-6">
+          <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto p-6">
             <div className="flex items-start justify-between gap-4">
               <h2 id="lightbox-title" className="font-serif text-2xl leading-tight">{photo.title}</h2>
               <button type="button" onClick={onClose} aria-label="Cerrar" className="text-2xl leading-none">×</button>
@@ -2464,13 +2497,14 @@ const dtos = photos.map((p) => toDTO(p, liked.has(p._id.toHexString())));
 - [ ] `npm run db:init` crea `photo_ip_unique` en la colección `likes`.
 - [ ] `/` muestra la galería en 1/2/3 columnas según el ancho; en *Network* las miniaturas llevan `c_limit,w_…,f_auto,q_auto` y se sirven como AVIF/WebP; no hay saltos de layout al cargar (Lighthouse CLS ≈ 0).
 - [ ] Clic en una foto → lightbox con imagen grande, título, fecha, descripción, etiquetas, hashtags, ubicación (abre Google Maps en pestaña nueva), ❤ y "Descargar HD".
+- [ ] Al abrir el lightbox y al navegar con ← / → el modal **no cambia de tamaño** (sin saltos): primero se ve la miniatura y la imagen grande aparece con un fundido; el fondo tampoco se desplaza al bloquearse el scroll.
 - [ ] ← / → navegan entre fotos; `Esc`, ✕ o clic en el fondo cierran; la URL cambia a `/?foto=<id>` y abrir esa URL en otra pestaña abre directamente el lightbox.
 - [ ] ❤: el contador sube al instante; recargar la página mantiene el corazón activo y el número.
 - [ ] Segundo clic quita el like (toggle) y el contador baja; nunca es negativo.
 - [ ] Desde **otro navegador del mismo equipo** (misma IP) el corazón aparece activo (lo indica el servidor vía `likedByMe`) y un clic lo quita: 1 like por IP.
 - [ ] Desde el móvil con datos (otra IP) se puede dar un like adicional.
 - [ ] En Mongo, `likes` guarda `ipHash` (64 hex), **nunca** la IP en claro.
-- [ ] Concurrencia: `for i in 1 2 3 4 5; do curl -s -X POST -H 'Origin: http://localhost:4321' http://localhost:4321/api/photos/<ID>/like & done; wait` → `likesCount` final es 0 o 1, jamás > 1.
+- [ ] Concurrencia: `for i in 1 2 3 4 5 6 7; do curl -s -X POST -H 'Origin: http://localhost:4321' http://localhost:4321/api/photos/<ID>/like & done; wait` (repetir varias rondas) → tras cada ronda, `likesCount` es **igual** al número de documentos de `likes` de esa foto (0 o 1).
 - [ ] "Descargar HD" descarga un archivo llamado `<slug-del-titulo>.<ext>` con las dimensiones originales (`width×height` mostrados).
 - [ ] Todo correcto en tema claro/oscuro y en 375 px.
 
@@ -2567,7 +2601,7 @@ npm run build      # astro check + astro build → .vercel/output/
 |---|---|
 | Versiones de `better-auth` y `@better-auth/mongo-adapter` desalineadas | Instalar ambas con la misma versión exacta (`@1.7.12`). |
 | `mongod` local sin replica set → errores de transacción en Better Auth | `MONGODB_TRANSACTIONS=false`. |
-| Contador `likesCount` desincronizado tras un fallo entre `insertOne` y `$inc` | Probabilidad baja; si ocurre, recalcular: `db.likes.aggregate([{ $group: { _id: '$photoId', n: { $sum: 1 } } }])` y fijar cada `likesCount`. |
+| Contador `likesCount` desincronizado (clics simultáneos o fallo entre `insertOne` y `$inc`) | `$inc` ±1 **sin condiciones** ligado a cada alta/baja real (las operaciones conmutan, el valor final siempre cuadra; un filtro `likesCount > 0` rompía esto y se eliminó). Si aun así se descuadra: `npm run db:recount-likes`. |
 | Varios visitantes detrás de la misma IP (NAT, oficina) comparten like | Limitación aceptada del requisito "1 like por IP". |
 | Spoofing de `X-Forwarded-For` | Solo se lee si `TRUST_PROXY=true` (es decir, cuando un proxy de confianza la sobrescribe). |
 | Imágenes huérfanas en Cloudinary si falla Mongo al crear | Compensación con `destroyImage` en el `catch` de `POST /api/photos`. Si se abandona el formulario tras subir, limpieza manual en la Media Library. |

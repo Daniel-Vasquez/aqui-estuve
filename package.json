@@ -12,7 +12,8 @@
     "astro": "astro",
     "check": "astro check",
     "db:init": "tsx --env-file=.env scripts/init-db.ts",
-    "seed:admin": "tsx --env-file=.env scripts/seed-admin.ts"
+    "seed:admin": "tsx --env-file=.env scripts/seed-admin.ts",
+    "db:recount-likes": "tsx --env-file=.env scripts/recount-likes.ts"
   },
   "dependencies": {
     "@astrojs/react": "^7.1.1",

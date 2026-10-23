@@ -1,10 +1,10 @@
 import type { PhotoDTO } from '@/lib/photos/types';
-import { downloadUrl, thumbSrcSet, thumbUrl } from '@/lib/cloudinary-url';
+import { thumbSrcSet, thumbUrl } from '@/lib/cloudinary-url';
 import { formatDimensions, formatPhotoDate } from '@/lib/format';
 import { isDesktop } from '@/lib/media';
 import DeviceIcon from '@/components/icons/DeviceIcon';
-import DownloadIcon from '@/components/icons/DownloadIcon';
 import LikeButton from './LikeButton';
+import DownloadButton from './DownloadButton';
 import LocationLink from './LocationLink';
 
 interface Props {
@@ -59,15 +59,10 @@ export default function PhotoCard({ photo, liked, eager, animate, animationDelay
 
       {/* 3–8. Detalle (solo mobile) */}
       <div className="mt-3 flex flex-col gap-3 md:hidden">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-5">
           <LikeButton photoId={photo.id} count={photo.likesCount} liked={liked}
             onChange={(s) => onLikeChange(photo.id, s)} />
-          {/* fl_attachment ⇒ descarga directa del original */}
-          <a href={downloadUrl(photo.imageUrl, photo.title)} rel="noopener"
-            aria-label="Descargar original en alta calidad" title="Descargar original en alta calidad"
-            className="flex items-center rounded-full border border-stone-300 px-4 py-2 text-stone-600 transition hover:scale-105 dark:border-stone-700 dark:text-stone-300">
-            <DownloadIcon className="size-5" />
-          </a>
+          <DownloadButton imageUrl={photo.imageUrl} title={photo.title} />
         </div>
 
         {photo.location && <LocationLink location={photo.location} />}

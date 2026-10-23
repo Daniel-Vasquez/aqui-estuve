@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PhotoDTO } from '@/lib/photos/types';
-import { downloadUrl, lightboxUrl, thumbUrl } from '@/lib/cloudinary-url';
+import { lightboxUrl, thumbUrl } from '@/lib/cloudinary-url';
 import { formatPhotoDate } from '@/lib/format';
 import Modal from '@/components/ui/Modal';
 import DeviceIcon from '@/components/icons/DeviceIcon';
 import LikeButton from './LikeButton';
+import DownloadButton from './DownloadButton';
 import LocationLink from './LocationLink';
 
 interface Props {
@@ -90,14 +91,10 @@ export default function Lightbox({ photo, liked, onClose, onPrev, onNext, onLike
             {photo.hashtags.length > 0 && (
               <p className="text-sm text-sky-700 dark:text-sky-400">{photo.hashtags.map((h) => `#${h}`).join(' ')}</p>
             )}
-            <div className="mt-auto flex flex-wrap items-center gap-3 pt-4">
+            <div className="mt-auto flex flex-wrap items-center gap-5 pt-4">
               <LikeButton photoId={photo.id} count={photo.likesCount} liked={liked}
                 onChange={(s) => onLikeChange(photo.id, s)} />
-              {/* fl_attachment ⇒ Cloudinary responde con Content-Disposition: attachment (funciona cross-origin) */}
-              <a href={downloadUrl(photo.imageUrl, photo.title)} rel="noopener"
-                className="rounded-full bg-stone-900 px-4 py-2 text-white dark:bg-stone-100 dark:text-stone-900">
-                ↓ Descargar HD
-              </a>
+              <DownloadButton imageUrl={photo.imageUrl} title={photo.title} />
               <span className="text-xs text-stone-500">{photo.width}×{photo.height} · {photo.format.toUpperCase()}</span>
             </div>
           </aside>

@@ -7,7 +7,7 @@
 
 ## 0. Cómo usar este documento
 
-1. Antes de cada tanda, revisa la sección **"Variables de Entorno Requeridas"** y rellénalas en `.env` (copiado de `.env.example`).
+1. Antes de cada tanda, revisa la sección **"Variables de Entorno Requeridas"** y rellénalas en `.env` (copiado de `.env.example`). **Reinicia el servidor de desarrollo** (`npx astro dev stop && npx astro dev --background`) tras editar `.env`: solo lo lee al arrancar.
 2. Ejecuta los comandos de **"Dependencias a Instalar"** tal cual.
 3. Crea/modifica exactamente los archivos listados. El código de referencia es **normativo** en lo que respecta a imports, firmas de librerías y contratos de API; el estilo visual (clases Tailwind) puede ajustarse.
 4. No avances sin marcar todo el **Checklist** de la tanda.
@@ -1294,6 +1294,7 @@ export const POST: APIRoute = () => json(signUpload());
 **`src/pages/api/photos/index.ts`**
 ```ts
 import type { APIRoute } from 'astro';
+import { z } from 'zod';
 import { MongoServerError } from 'mongodb';
 import { json, jsonError } from '@/lib/http';
 import { FOLDER, MAX_BYTES, destroyImage, getImage } from '@/lib/cloudinary';
@@ -1314,7 +1315,7 @@ export const POST: APIRoute = async ({ request }) => {
   try { body = await request.json(); } catch { return jsonError(400, 'JSON inválido'); }
 
   const parsed = photoCreateSchema.safeParse(body);
-  if (!parsed.success) return jsonError(400, 'Datos inválidos', parsed.error.flatten());
+  if (!parsed.success) return jsonError(400, 'Datos inválidos', z.flattenError(parsed.error));
   const { publicId } = parsed.data;
 
   // Solo se aceptan recursos de nuestra carpeta (evita registrar imágenes ajenas de la cuenta).
@@ -1354,6 +1355,7 @@ export const POST: APIRoute = async ({ request }) => {
 **`src/pages/api/photos/[id].ts`**
 ```ts
 import type { APIRoute } from 'astro';
+import { z } from 'zod';
 import { json, jsonError } from '@/lib/http';
 import { destroyImage } from '@/lib/cloudinary';
 import { photoUpdateSchema } from '@/lib/photos/schema';
@@ -1375,7 +1377,7 @@ export const PUT: APIRoute = async ({ params, request }) => {
   try { body = await request.json(); } catch { return jsonError(400, 'JSON inválido'); }
 
   const parsed = photoUpdateSchema.safeParse(body);
-  if (!parsed.success) return jsonError(400, 'Datos inválidos', parsed.error.flatten());
+  if (!parsed.success) return jsonError(400, 'Datos inválidos', z.flattenError(parsed.error));
 
   const updated = await updatePhoto(id, parsed.data);
   return updated ? json({ photo: toDTO(updated) }) : jsonError(404, 'No encontrada');
@@ -1458,7 +1460,7 @@ curl -s -b /tmp/ae.txt -H "$O" -X DELETE http://localhost:4321/api/photos/<ID>
 - [ ] (2b) devuelve un `public_id` que empieza por `aqui-estuve/`. Cambiar `folder` en la petición → Cloudinary responde `Invalid Signature`.
 - [ ] (2c) devuelve **201** con `imageUrl`, `publicId`, `width`, `height`, `format`, `tags: ["perú","viajes"]`, `hashtags: ["cusco","andes"]` y `slug` del tipo `atardecer-en-cusco-xxxxxx`. Repetir (2c) con el mismo `publicId` → **409**.
 - [ ] La imagen aparece en Cloudinary → *Media Library* → carpeta `aqui-estuve`.
-- [ ] Abrir en el navegador `thumbUrl(imageUrl)` (insertando `c_limit,w_800,f_auto,q_auto/` tras `/image/upload/`) sirve una imagen optimizada (en Chrome, *Network* muestra `content-type: image/avif` o `webp`).
+- [ ] Abrir en el navegador `thumbUrl(imageUrl)` (insertando `c_limit,w_800,f_auto,q_auto/` tras `/image/upload/`) sirve una imagen redimensionada y más ligera que el original. Con `f_auto`, Cloudinary elige el formato más eficiente **para cada foto**: puede ser AVIF/WebP, pero también JPEG si los otros pesan más. Para comprobar que la cuenta soporta los formatos modernos, `f_webp` y `f_avif` deben devolver `image/webp` e `image/avif`.
 - [ ] Insertando `fl_attachment:prueba/` el navegador **descarga** `prueba.jpg`.
 - [ ] (4) actualiza título y `slug`; `updatedAt` cambia.
 - [ ] (5) devuelve `{ ok: true }` y la imagen **desaparece de Cloudinary**.

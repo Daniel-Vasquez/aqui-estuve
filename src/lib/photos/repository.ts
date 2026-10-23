@@ -1,0 +1,81 @@
+import { ObjectId, type Filter } from 'mongodb';
+import type { CloudinaryImage } from '../cloudinary';
+import { db } from '../db';
+import { slugify } from '../slug';
+import type { PhotoDoc } from './types';
+import type { PhotoCreateInput, PhotoUpdateInput } from './schema';
+
+export const photosCol = () => db.collection<PhotoDoc>('photos');
+
+export function parseObjectId(id: string | undefined): ObjectId | null {
+  return id && ObjectId.isValid(id) && /^[a-f0-9]{24}$/i.test(id) ? new ObjectId(id) : null;
+}
+
+const buildSlug = (title: string, id: ObjectId) =>
+  `${slugify(title) || 'foto'}-${id.toHexString().slice(-6)}`;
+
+export async function listPhotos({ limit = 24, cursor }: { limit?: number; cursor?: string | null }) {
+  const safeLimit = Math.min(Math.max(limit, 1), 60);
+  const filter: Filter<PhotoDoc> = {};
+
+  if (cursor) {
+    const cursorId = parseObjectId(cursor);
+    const ref = cursorId ? await photosCol().findOne({ _id: cursorId }, { projection: { createdAt: 1 } }) : null;
+    if (ref) {
+      filter.$or = [
+        { createdAt: { $lt: ref.createdAt } },
+        { createdAt: ref.createdAt, _id: { $lt: ref._id } },
+      ];
+    }
+  }
+
+  const docs = await photosCol()
+    .find(filter)
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(safeLimit + 1)
+    .toArray();
+
+  const hasMore = docs.length > safeLimit;
+  const page = hasMore ? docs.slice(0, safeLimit) : docs;
+  return { photos: page, nextCursor: hasMore ? page[page.length - 1]._id.toHexString() : null };
+}
+
+export const getPhoto = (id: ObjectId) => photosCol().findOne({ _id: id });
+
+export const findByPublicId = (publicId: string) => photosCol().findOne({ publicId });
+
+export async function createPhoto(input: PhotoCreateInput, image: CloudinaryImage): Promise<PhotoDoc> {
+  const _id = new ObjectId();
+  const now = new Date();
+  const doc: PhotoDoc = {
+    _id,
+    title: input.title,
+    slug: buildSlug(input.title, _id),
+    description: input.description,
+    tags: input.tags,
+    hashtags: input.hashtags,
+    location: input.location,
+    imageUrl: image.secure_url,
+    publicId: image.public_id,
+    width: image.width,
+    height: image.height,
+    format: image.format,
+    bytes: image.bytes,
+    likesCount: 0,
+    createdAt: input.createdAt ?? now,
+    updatedAt: now,
+  };
+  await photosCol().insertOne(doc);
+  return doc;
+}
+
+export async function updatePhoto(id: ObjectId, input: PhotoUpdateInput) {
+  const $set: Partial<PhotoDoc> = { ...input, updatedAt: new Date() };
+  if (input.title) $set.slug = buildSlug(input.title, id);
+  return photosCol().findOneAndUpdate({ _id: id }, { $set }, { returnDocument: 'after' });
+}
+
+export async function deletePhotoDoc(id: ObjectId) {
+  await photosCol().deleteOne({ _id: id });
+  await db.collection('likes').deleteMany({ photoId: id });
+}

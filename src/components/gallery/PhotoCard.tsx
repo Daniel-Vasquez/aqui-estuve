@@ -11,6 +11,8 @@ interface Props {
   photo: PhotoDTO;
   liked: boolean;
   eager?: boolean;
+  animate?: boolean;          // entrada con fade-up (tras filtrar)
+  animationDelay?: number;    // ms, escalonado sutil
   onOpen: () => void;
   onLikeChange: (id: string, s: { liked: boolean; likesCount: number }) => void;
 }
@@ -19,9 +21,11 @@ interface Props {
  * Desktop (md+): solo la imagen; clic → lightbox; nombre + dispositivo en hover.
  * Mobile (< md): tarjeta de feed con toda la información; la imagen no abre el modal.
  */
-export default function PhotoCard({ photo, liked, eager, onOpen, onLikeChange }: Props) {
+export default function PhotoCard({ photo, liked, eager, animate, animationDelay = 0, onOpen, onLikeChange }: Props) {
   return (
-    <article id={`foto-${photo.id}`} className="mb-12 break-inside-avoid scroll-mt-4 md:mb-4">
+    <article id={`foto-${photo.id}`}
+      style={animate ? { animationDelay: `${animationDelay}ms` } : undefined}
+      className={`mb-12 break-inside-avoid scroll-mt-4 md:mb-4 ${animate ? 'animate-fade-up motion-reduce:animate-none' : ''}`}>
       {/* 1. Cabecera (mobile): nombre + icono de dispositivo a su derecha */}
       <header className="mb-3 flex items-center justify-between gap-3 md:hidden">
         <h2 className="min-w-0 font-serif text-lg leading-tight">{photo.title}</h2>

@@ -4,9 +4,10 @@ import AdminDashboard from '@/components/admin/AdminDashboard';
 import { listPhotos } from '@/lib/photos/repository';
 import { toDTO } from '@/lib/photos/types';
 import { MAX_BYTES } from '@/lib/cloudinary';
+import { listCategories } from '@/lib/photos/category-repository';
 
-const { photos, nextCursor } = await listPhotos({ limit: 48 });
+const [{ photos, nextCursor }, categories] = await Promise.all([listPhotos({ limit: 48 }), listCategories()]);
 ---
 <AdminLayout>
-  <AdminDashboard client:load initialPhotos={photos.map((p) => toDTO(p))} initialCursor={nextCursor} maxBytes={MAX_BYTES} />
+  <AdminDashboard client:load initialPhotos={photos.map((p) => toDTO(p))} initialCursor={nextCursor} initialCategories={categories} maxBytes={MAX_BYTES} />
 </AdminLayout>

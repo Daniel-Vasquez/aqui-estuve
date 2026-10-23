@@ -2,11 +2,18 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Gallery from '@/components/gallery/Gallery';
 import { getPhoto, listPhotos, parseObjectId } from '@/lib/photos/repository';
+import { listCategories } from '@/lib/photos/category-repository';
+import { sameCategory } from '@/lib/photos/categories';
 import { toDTO } from '@/lib/photos/types';
 import { getClientIp, hashIp, likedSet } from '@/lib/likes';
 import { ogImageUrl } from '@/lib/cloudinary-url';
 
-const { photos, nextCursor } = await listPhotos({ limit: 30 });
+// Filtro compartible /?categoria=Paisaje (se normaliza a la forma canónica; si no existe, se ignora).
+const categories = await listCategories();
+const rawCategory = Astro.url.searchParams.get('categoria');
+const category = rawCategory ? categories.find((c) => sameCategory(c, rawCategory)) ?? null : null;
+
+const { photos, nextCursor } = await listPhotos({ limit: 30, category });
 
 // Enlace compartido /?foto=<id>: si no está en la primera página, se antepone.
 const sharedId = parseObjectId(Astro.url.searchParams.get('foto') ?? undefined);
@@ -25,5 +32,6 @@ const dtos = photos.map((p) => toDTO(p, liked.has(p._id.toHexString())));
   description={shared?.description?.slice(0, 160) || undefined}
   image={shared ? ogImageUrl(shared.imageUrl) : photos[0] ? ogImageUrl(photos[0].imageUrl) : undefined}
 >
-  <Gallery client:load initialPhotos={dtos} initialCursor={nextCursor} initialOpenId={shared?._id.toHexString() ?? null} />
+  <Gallery client:load initialPhotos={dtos} initialCursor={nextCursor} initialOpenId={shared?._id.toHexString() ?? null}
+    categories={categories} initialCategory={category} />
 </BaseLayout>

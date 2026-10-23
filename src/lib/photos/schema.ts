@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PHOTO_DEVICES } from './types';
+import { ALL_CATEGORIES_LABEL, CATEGORY_MAX_LENGTH, sameCategory } from './categories';
 
 const dedupe = (arr: string[]) => [...new Set(arr)];
 
@@ -43,6 +44,13 @@ const base = {
   hashtags,
   location: locationSchema.nullable(),
   device: z.enum(PHOTO_DEVICES).nullable(),
+  category: z
+    .string()
+    .trim()
+    .min(1)
+    .max(CATEGORY_MAX_LENGTH)
+    .refine((c) => !sameCategory(c, ALL_CATEGORIES_LABEL), { message: `"${ALL_CATEGORIES_LABEL}" es un nombre reservado` })
+    .nullable(),
   createdAt: z.coerce.date(),
 };
 
@@ -54,6 +62,7 @@ export const photoCreateSchema = z.object({
   hashtags: base.hashtags.default([]),
   location: base.location.default(null),
   device: base.device.default(null),           // no obligatorio
+  category: base.category.default(null),       // no obligatorio; se resuelve/crea en el endpoint
   createdAt: base.createdAt.optional(),        // si falta → ahora
 });
 

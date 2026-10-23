@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { PhotoDTO } from '@/lib/photos/types';
+import { sameCategory } from '@/lib/photos/categories';
 import { ApiError, deletePhoto, fetchPhotos } from '@/lib/api-client';
 import Modal from '@/components/ui/Modal';
 import PhotoForm from './PhotoForm';
@@ -8,9 +9,10 @@ import ConfirmDialog from './ConfirmDialog';
 
 type Editor = { mode: 'create' } | { mode: 'edit'; photo: PhotoDTO } | null;
 
-export default function AdminDashboard({ initialPhotos, initialCursor, maxBytes }: {
-  initialPhotos: PhotoDTO[]; initialCursor: string | null; maxBytes: number;
+export default function AdminDashboard({ initialPhotos, initialCursor, initialCategories, maxBytes }: {
+  initialPhotos: PhotoDTO[]; initialCursor: string | null; initialCategories: string[]; maxBytes: number;
 }) {
+  const [categories, setCategories] = useState(initialCategories);
   const [photos, setPhotos] = useState(initialPhotos);
   const [cursor, setCursor] = useState(initialCursor);
   const [editor, setEditor] = useState<Editor>(null);
@@ -24,6 +26,9 @@ export default function AdminDashboard({ initialPhotos, initialCursor, maxBytes 
       const next = exists ? prev.map((p) => (p.id === saved.id ? saved : p)) : [saved, ...prev];
       return next.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     });
+    // Una categoría recién creada pasa a estar disponible sin recargar.
+    const cat = saved.category;
+    if (cat && !categories.some((c) => sameCategory(c, cat))) setCategories((prev) => [...prev, cat]);
     setEditor(null);
     setNotice('Guardado ✔');
   }
@@ -84,6 +89,7 @@ export default function AdminDashboard({ initialPhotos, initialCursor, maxBytes 
           <PhotoForm
             key={editor.mode === 'edit' ? editor.photo.id : 'new'}
             photo={editor.mode === 'edit' ? editor.photo : undefined}
+            categories={categories}
             maxBytes={maxBytes}
             onSaved={onSaved}
             onCancel={() => setEditor(null)}

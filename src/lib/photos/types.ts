@@ -23,6 +23,7 @@ export interface PhotoDoc {
   hashtags: string[];
   location: PhotoLocation | null;
   device?: PhotoDevice | null;   // opcional: las publicaciones anteriores no lo tienen
+  category?: string | null;      // opcional: idem
   imageUrl: string;
   publicId: string;
   width: number;
@@ -35,20 +36,22 @@ export interface PhotoDoc {
 }
 
 /** Forma serializable que viaja al cliente (props de islas y JSON de la API). */
-export interface PhotoDTO extends Omit<PhotoDoc, '_id' | 'device' | 'createdAt' | 'updatedAt'> {
+export interface PhotoDTO extends Omit<PhotoDoc, '_id' | 'device' | 'category' | 'createdAt' | 'updatedAt'> {
   id: string;
   device: PhotoDevice | null;
+  category: string | null;
   createdAt: string;
   updatedAt: string;
   likedByMe?: boolean;
 }
 
 export function toDTO(doc: WithId<PhotoDoc> | PhotoDoc, likedByMe?: boolean): PhotoDTO {
-  const { _id, createdAt, updatedAt, device, ...rest } = doc;
+  const { _id, createdAt, updatedAt, device, category, ...rest } = doc;
   return {
     ...rest,
     id: _id.toHexString(),
     device: device ?? null,
+    category: category ?? null,
     createdAt: createdAt.toISOString(),
     updatedAt: updatedAt.toISOString(),
     ...(likedByMe === undefined ? {} : { likedByMe }),

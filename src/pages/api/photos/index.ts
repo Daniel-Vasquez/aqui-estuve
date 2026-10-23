@@ -7,11 +7,16 @@ import { photoCreateSchema } from '@/lib/photos/schema';
 import { createPhoto, findByPublicId, listPhotos } from '@/lib/photos/repository';
 import { toDTO } from '@/lib/photos/types';
 import { getClientIp, hashIp, likedSet } from '@/lib/likes';
+import { resolveCategory } from '@/lib/photos/category-repository';
+import { ALL_CATEGORIES_LABEL, sameCategory } from '@/lib/photos/categories';
 
 export const GET: APIRoute = async (ctx) => {
   const limit = Number(ctx.url.searchParams.get('limit') ?? 24) || 24;
   const cursor = ctx.url.searchParams.get('cursor');
-  const { photos, nextCursor } = await listPhotos({ limit, cursor });
+  // ?category=Paisaje filtra; ausente o "Todas" → todas.
+  const rawCategory = ctx.url.searchParams.get('category')?.trim();
+  const category = rawCategory && !sameCategory(rawCategory, ALL_CATEGORIES_LABEL) ? rawCategory : null;
+  const { photos, nextCursor } = await listPhotos({ limit, cursor, category });
   const ip = getClientIp(ctx);
   const liked = ip ? await likedSet(hashIp(ip), photos.map((p) => p._id)) : new Set<string>();
   return json({ photos: photos.map((p) => toDTO(p, liked.has(p._id.toHexString()))), nextCursor });
@@ -45,6 +50,8 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   try {
+    // Al final: una categoría nueva solo se registra si la publicación es válida.
+    parsed.data.category = await resolveCategory(parsed.data.category);
     const photo = await createPhoto(parsed.data, image);
     return json({ photo: toDTO(photo) }, 201);
   } catch (err) {

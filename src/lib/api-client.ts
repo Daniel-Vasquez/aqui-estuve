@@ -17,6 +17,7 @@ export interface PhotoMetadata {
   hashtags: string[];
   location: { name: string; mapsUrl?: string; lat?: number; lng?: number } | null;
   device: PhotoDevice | null;
+  category: string | null;
   createdAt: string; // ISO
 }
 
@@ -79,9 +80,13 @@ export const updatePhoto = (id: string, patch: Partial<PhotoMetadata>) =>
 export const deletePhoto = (id: string) =>
   fetch(`/api/photos/${id}`, { method: 'DELETE' }).then((r) => handle<{ ok: true }>(r));
 
-export const fetchPhotos = (cursor?: string | null, limit = 24) =>
-  fetch(`/api/photos?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`)
-    .then((r) => handle<{ photos: PhotoDTO[]; nextCursor: string | null }>(r));
+export async function fetchPhotos(cursor?: string | null, limit = 24, category?: string | null, signal?: AbortSignal) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set('cursor', cursor);
+  if (category) params.set('category', category);
+  const res = await fetch(`/api/photos?${params}`, { signal });
+  return handle<{ photos: PhotoDTO[]; nextCursor: string | null }>(res);
+}
 
 export const toggleLike = (id: string) =>
   fetch(`/api/photos/${id}/like`, { method: 'POST' })

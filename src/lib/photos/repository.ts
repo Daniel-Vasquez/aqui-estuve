@@ -14,9 +14,13 @@ export function parseObjectId(id: string | undefined): ObjectId | null {
 const buildSlug = (title: string, id: ObjectId) =>
   `${slugify(title) || 'foto'}-${id.toHexString().slice(-6)}`;
 
-export async function listPhotos({ limit = 24, cursor }: { limit?: number; cursor?: string | null }) {
+export async function listPhotos({ limit = 24, cursor, category }: {
+  limit?: number;
+  cursor?: string | null;
+  category?: string | null;   // null/undefined = todas
+}) {
   const safeLimit = Math.min(Math.max(limit, 1), 60);
-  const filter: Filter<PhotoDoc> = {};
+  const filter: Filter<PhotoDoc> = category ? { category } : {};
 
   if (cursor) {
     const cursorId = parseObjectId(cursor);
@@ -56,6 +60,7 @@ export async function createPhoto(input: PhotoCreateInput, image: CloudinaryImag
     hashtags: input.hashtags,
     location: input.location,
     device: input.device,
+    category: input.category,
     imageUrl: image.secure_url,
     publicId: image.public_id,
     width: image.width,

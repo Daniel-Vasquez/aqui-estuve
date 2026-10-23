@@ -4,6 +4,7 @@ import { ApiError, createPhoto, updatePhoto, type PhotoMetadata } from '@/lib/ap
 import { thumbUrl } from '@/lib/cloudinary-url';
 import DeviceIcon from '@/components/icons/DeviceIcon';
 import TagInput from './TagInput';
+import CategoryField from './CategoryField';
 
 const DEVICE_OPTIONS: { value: PhotoDevice | null; label: string }[] = [
   { value: null, label: 'Sin indicar' },
@@ -12,6 +13,7 @@ const DEVICE_OPTIONS: { value: PhotoDevice | null; label: string }[] = [
 
 interface Props {
   photo?: PhotoDTO;                 // presente = modo edición
+  categories: string[];
   maxBytes: number;                 // UPLOAD_MAX_MB en bytes (lo pasa la página)
   onSaved: (p: PhotoDTO) => void;
   onCancel: () => void;
@@ -23,7 +25,7 @@ function toLocalInput(iso: string) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
-export default function PhotoForm({ photo, maxBytes, onSaved, onCancel }: Props) {
+export default function PhotoForm({ photo, categories, maxBytes, onSaved, onCancel }: Props) {
   const editing = Boolean(photo);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(photo ? thumbUrl(photo.imageUrl, 800) : null);
@@ -34,6 +36,7 @@ export default function PhotoForm({ photo, maxBytes, onSaved, onCancel }: Props)
   const [locName, setLocName] = useState(photo?.location?.name ?? '');
   const [mapsUrl, setMapsUrl] = useState(photo?.location?.mapsUrl ?? '');
   const [device, setDevice] = useState<PhotoDevice | null>(photo?.device ?? null);
+  const [category, setCategory] = useState<string | null>(photo?.category ?? null);
   const [date, setDate] = useState(toLocalInput(photo?.createdAt ?? new Date().toISOString()));
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +63,7 @@ export default function PhotoForm({ photo, maxBytes, onSaved, onCancel }: Props)
       hashtags,
       location: locName.trim() ? { name: locName.trim(), ...(mapsUrl.trim() ? { mapsUrl: mapsUrl.trim() } : {}) } : null,
       device,
+      category: category?.trim() || null,
       createdAt: new Date(date).toISOString(),
     };
 
@@ -105,6 +109,7 @@ export default function PhotoForm({ photo, maxBytes, onSaved, onCancel }: Props)
         <input required maxLength={140} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título" className={input} />
         <textarea rows={5} maxLength={5000} value={description} onChange={(e) => setDescription(e.target.value)}
           placeholder="La historia detrás de la foto…" className={input} />
+        <CategoryField categories={categories} value={category} onChange={setCategory} className={input} />
         <TagInput label="Etiquetas" value={tags} onChange={setTags} placeholder="viajes, montaña…" />
         <TagInput label="Hashtags" prefix="#" value={hashtags} onChange={setHashtags} placeholder="#atardecer" />
         <input value={locName} onChange={(e) => setLocName(e.target.value)} placeholder="Lugar (p. ej. Plaza de Armas, Cusco)" className={input} />

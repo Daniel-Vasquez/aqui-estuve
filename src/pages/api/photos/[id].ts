@@ -5,6 +5,7 @@ import { destroyImage } from '@/lib/cloudinary';
 import { photoUpdateSchema } from '@/lib/photos/schema';
 import { deletePhotoDoc, getPhoto, parseObjectId, updatePhoto } from '@/lib/photos/repository';
 import { toDTO } from '@/lib/photos/types';
+import { resolveCategory } from '@/lib/photos/category-repository';
 
 export const GET: APIRoute = async ({ params }) => {
   const id = parseObjectId(params.id);
@@ -23,6 +24,7 @@ export const PUT: APIRoute = async ({ params, request }) => {
   const parsed = photoUpdateSchema.safeParse(body);
   if (!parsed.success) return jsonError(400, 'Datos inválidos', z.flattenError(parsed.error));
 
+  if (parsed.data.category !== undefined) parsed.data.category = await resolveCategory(parsed.data.category);
   const updated = await updatePhoto(id, parsed.data);
   return updated ? json({ photo: toDTO(updated) }) : jsonError(404, 'No encontrada');
 };

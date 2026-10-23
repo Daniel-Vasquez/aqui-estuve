@@ -519,6 +519,13 @@ Login de administrador por email/contraseña con cookies HTTP-only; imposibilida
 ```bash
 npm install better-auth@1.7.12 @better-auth/mongo-adapter@1.7.12
 ```
+Después, en `package.json`:
+- Quitar el `^` de ambas (versión exacta `"1.7.12"`): deben ir siempre a la par.
+- Añadir este `override`. `@astrojs/vercel` trae `path-to-regexp@6.1.0` (vulnerabilidad *high* en npm audit), y el `npm audit fix --force` que sugiere npm bajaría el adaptador a la v8:
+  ```json
+  "overrides": { "path-to-regexp@6": "^6.3.0" }
+  ```
+  Luego `npm install` → `npm audit` debe dar `found 0 vulnerabilities`.
 
 ### 4. Archivos a Crear o Modificar
 ```
@@ -603,6 +610,8 @@ export const auth = betterAuth({
 export type AuthSession = typeof auth.$Infer.Session;
 ```
 > ⚠ No usar `emailAndPassword.disableSignUp: true`: en 1.7 la comprobación vive dentro del endpoint y también bloquearía `auth.api.signUpEmail` del seed.
+>
+> ⚠ Con `autoSignIn: false`, cuando el hook lanza `FORBIDDEN` Better Auth **no propaga el error**: devuelve un usuario ficticio (`token: null`) para no revelar qué correos existen. El alta queda bloqueada igualmente, pero cualquier código que llame a `signUpEmail` debe confirmar en la BD que el usuario existe (lo hace el seed).
 
 **`src/pages/api/auth/[...all].ts`**
 ```ts
@@ -720,6 +729,11 @@ async function main() {
 
   // Llamada directa (no HTTP): el middleware no interviene; el hook valida ADMIN_EMAIL.
   await auth.api.signUpEmail({ body: { email: ADMIN_EMAIL, password, name } });
+
+  // Con autoSignIn: false, Better Auth responde con un usuario ficticio si el hook
+  // rechaza el alta (anti-enumeración): hay que confirmar en la BD.
+  const created = await db.collection('user').findOne({ email: ADMIN_EMAIL });
+  if (!created) throw new Error('Better Auth no creó el usuario (rechazado por el hook).');
   console.log(`✔ Administrador creado: ${ADMIN_EMAIL}`);
   console.log('  Ya puedes borrar ADMIN_PASSWORD de tu .env');
 }
@@ -777,14 +791,15 @@ const user = Astro.locals.user;
 
 **`src/components/admin/LoginForm.tsx`**
 ```tsx
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { authClient } from '@/lib/auth-client';
 
+// Nota: en @types/react 19.3 `FormEvent` está obsoleto → usar `SubmitEvent` en onSubmit.
 export default function LoginForm({ next = '/admin' }: { next?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setLoading(true);
@@ -882,6 +897,7 @@ const user = Astro.locals.user!;
   # → HTTP/1.1 403
   ```
 - [ ] Mutación sin sesión bloqueada: `curl -i -X DELETE http://localhost:4321/api/photos/123 -H 'Origin: http://localhost:4321'` → **401**.
+- [ ] Hook: llamar a `auth.api.signUpEmail` desde un script con otro correo **no** crea usuario (`db.user.countDocuments()` sigue en 1), aunque la llamada no lance error.
 
 ---
 
@@ -1661,7 +1677,7 @@ export default function TagInput({ label, value, onChange, prefix = '', placehol
 
 **`src/components/admin/PhotoForm.tsx`** — mismo componente para crear y editar.
 ```tsx
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type SubmitEvent } from 'react';
 import type { PhotoDTO } from '@/lib/photos/types';
 import { ApiError, createPhoto, updatePhoto, type PhotoMetadata } from '@/lib/api-client';
 import { thumbUrl } from '@/lib/cloudinary-url';
@@ -1704,7 +1720,7 @@ export default function PhotoForm({ photo, maxBytes, onSaved, onCancel }: Props)
     setPreview(URL.createObjectURL(f));
   }
 
-  async function onSubmit(e: FormEvent) {
+  async function onSubmit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     if (!editing && !file) return setError('Selecciona una imagen');

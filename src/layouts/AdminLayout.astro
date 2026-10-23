@@ -1,0 +1,40 @@
+---
+import '@/styles/global.css';
+import ThemeToggle from '@/components/ThemeToggle';
+import LogoutButton from '@/components/admin/LogoutButton';
+
+interface Props { title?: string }
+const { title = 'Admin · Aquí Estuve' } = Astro.props;
+const user = Astro.locals.user;
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <script is:inline>
+      (() => {
+        let s = null; try { s = localStorage.getItem('theme'); } catch {}
+        const d = s ? s === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.classList.toggle('dark', d);
+        document.documentElement.style.colorScheme = d ? 'dark' : 'light';
+      })();
+    </script>
+    <title>{title}</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body class="min-h-dvh font-sans">
+    <header class="border-b border-stone-200 dark:border-stone-800">
+      <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+        <a href="/admin" class="font-serif text-xl">Aquí Estuve · CMS</a>
+        <div class="flex items-center gap-3">
+          <a href="/" class="text-sm underline-offset-4 hover:underline">Ver sitio</a>
+          <ThemeToggle client:load />
+          {user && <LogoutButton client:load />}
+        </div>
+      </div>
+    </header>
+    <main class="mx-auto max-w-7xl px-4 py-8"><slot /></main>
+  </body>
+</html>

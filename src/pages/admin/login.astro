@@ -1,0 +1,11 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import LoginForm from '@/components/admin/LoginForm';
+
+// Evita open-redirect: solo rutas internas de /admin.
+const raw = Astro.url.searchParams.get('next') ?? '/admin';
+const next = raw.startsWith('/admin') && !raw.startsWith('//') ? raw : '/admin';
+---
+<AdminLayout title="Acceso · Aquí Estuve">
+  <LoginForm client:load next={next} />
+</AdminLayout>

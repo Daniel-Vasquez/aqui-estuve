@@ -1,0 +1,8 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+const user = Astro.locals.user!;
+---
+<AdminLayout>
+  <h1 class="font-serif text-3xl">Hola, {user.name}</h1>
+  <p class="mt-2 text-stone-500">Sesión activa como {user.email}.</p>
+</AdminLayout>

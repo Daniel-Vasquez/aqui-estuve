@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PHOTO_DEVICES } from './types';
 
 const dedupe = (arr: string[]) => [...new Set(arr)];
 
@@ -41,6 +42,7 @@ const base = {
   tags,
   hashtags,
   location: locationSchema.nullable(),
+  device: z.enum(PHOTO_DEVICES).nullable(),
   createdAt: z.coerce.date(),
 };
 
@@ -51,6 +53,7 @@ export const photoCreateSchema = z.object({
   tags: base.tags.default([]),
   hashtags: base.hashtags.default([]),
   location: base.location.default(null),
+  device: base.device.default(null),           // no obligatorio
   createdAt: base.createdAt.optional(),        // si falta → ahora
 });
 

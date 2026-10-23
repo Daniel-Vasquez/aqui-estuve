@@ -1,5 +1,6 @@
 import type { PhotoDTO } from '@/lib/photos/types';
 import { thumbSrcSet, thumbUrl } from '@/lib/cloudinary-url';
+import DeviceIcon from '@/components/icons/DeviceIcon';
 
 export default function PhotoCard({ photo, onOpen, eager }: { photo: PhotoDTO; onOpen: () => void; eager?: boolean }) {
   return (
@@ -16,8 +17,10 @@ export default function PhotoCard({ photo, onOpen, eager }: { photo: PhotoDTO; o
         decoding="async"
         className="h-auto w-full bg-stone-200 transition duration-500 group-hover:scale-[1.02] dark:bg-stone-800"
       />
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 text-left text-sm text-white opacity-0 transition group-hover:opacity-100">
-        {photo.title}
+      {/* Nombre + icono comparten la capa: misma aparición en hover (y mismo comportamiento táctil) */}
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/60 to-transparent p-3 text-left text-sm text-white opacity-0 transition group-hover:opacity-100">
+        <span className="min-w-0 truncate">{photo.title}</span>
+        <DeviceIcon device={photo.device} className="size-4 shrink-0 drop-shadow" />
       </span>
     </button>
   );

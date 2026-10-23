@@ -1,4 +1,4 @@
-import type { PhotoDTO } from './photos/types';
+import type { PhotoDevice, PhotoDTO } from './photos/types';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: unknown) { super(message); }
@@ -16,6 +16,7 @@ export interface PhotoMetadata {
   tags: string[];
   hashtags: string[];
   location: { name: string; mapsUrl?: string; lat?: number; lng?: number } | null;
+  device: PhotoDevice | null;
   createdAt: string; // ISO
 }
 

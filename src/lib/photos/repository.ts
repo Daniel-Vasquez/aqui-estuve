@@ -55,6 +55,7 @@ export async function createPhoto(input: PhotoCreateInput, image: CloudinaryImag
     tags: input.tags,
     hashtags: input.hashtags,
     location: input.location,
+    device: input.device,
     imageUrl: image.secure_url,
     publicId: image.public_id,
     width: image.width,

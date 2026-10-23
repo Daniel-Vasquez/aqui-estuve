@@ -143,6 +143,7 @@ aqui-estuve/
     mapsUrl?: string,            // URL de Google Maps pegada por el admin
     lat?: number, lng?: number   // opcionales, van juntas
   } | null,
+  device?: 'iphone' | 'camera' | null, // dispositivo de captura (opcional; ausente en publicaciones antiguas → null)
   imageUrl: string,              // secure_url de Cloudinary (original)
   publicId: string,              // "aqui-estuve/xyz123"
   width: number, height: number,
@@ -2612,6 +2613,10 @@ npm run build      # astro check + astro build → .vercel/output/
 | Arranque en frío de funciones Vercel (primera petición más lenta) | Singleton de `MongoClient` en `globalThis`; aceptable para un fotoblog personal. |
 | Límite de la Admin API de Cloudinary (500 llamadas/hora en plan gratuito) | Solo se usa `api.resource` al publicar una foto: muy por debajo del límite. |
 | "Strict transformations" activado en Cloudinary | Verificado en Tanda 3; si se activa, las URLs transformadas fallan. |
+
+## Anexo C — Ampliaciones posteriores
+
+**Dispositivo de captura (`device`)**: selector segmentado *Sin indicar / iPhone / Cámara* en `PhotoForm`; icono SVG inline (`src/components/icons/DeviceIcon.tsx`, con `aria-label` + `<title>`) junto al nombre en `PhotoCard` (misma capa → misma aparición en hover) y en el lightbox arriba a la izquierda de la imagen (fuera del panel de información). Sin migración: los documentos sin el campo se leen como `null` en `toDTO` y no muestran icono.
 
 ## Anexo B — Mejoras futuras (fuera de alcance)
 - Leer la fecha EXIF (`DateTimeOriginal`) subiendo con `media_metadata: true` y usarla como `createdAt` por defecto.

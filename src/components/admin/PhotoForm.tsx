@@ -1,8 +1,14 @@
 import { useEffect, useState, type SubmitEvent } from 'react';
-import type { PhotoDTO } from '@/lib/photos/types';
+import { DEVICE_LABEL, PHOTO_DEVICES, type PhotoDevice, type PhotoDTO } from '@/lib/photos/types';
 import { ApiError, createPhoto, updatePhoto, type PhotoMetadata } from '@/lib/api-client';
 import { thumbUrl } from '@/lib/cloudinary-url';
+import DeviceIcon from '@/components/icons/DeviceIcon';
 import TagInput from './TagInput';
+
+const DEVICE_OPTIONS: { value: PhotoDevice | null; label: string }[] = [
+  { value: null, label: 'Sin indicar' },
+  ...PHOTO_DEVICES.map((d) => ({ value: d, label: DEVICE_LABEL[d] })),
+];
 
 interface Props {
   photo?: PhotoDTO;                 // presente = modo edición
@@ -27,6 +33,7 @@ export default function PhotoForm({ photo, maxBytes, onSaved, onCancel }: Props)
   const [hashtags, setHashtags] = useState<string[]>(photo?.hashtags ?? []);
   const [locName, setLocName] = useState(photo?.location?.name ?? '');
   const [mapsUrl, setMapsUrl] = useState(photo?.location?.mapsUrl ?? '');
+  const [device, setDevice] = useState<PhotoDevice | null>(photo?.device ?? null);
   const [date, setDate] = useState(toLocalInput(photo?.createdAt ?? new Date().toISOString()));
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +59,7 @@ export default function PhotoForm({ photo, maxBytes, onSaved, onCancel }: Props)
       tags,
       hashtags,
       location: locName.trim() ? { name: locName.trim(), ...(mapsUrl.trim() ? { mapsUrl: mapsUrl.trim() } : {}) } : null,
+      device,
       createdAt: new Date(date).toISOString(),
     };
 
@@ -101,6 +109,21 @@ export default function PhotoForm({ photo, maxBytes, onSaved, onCancel }: Props)
         <TagInput label="Hashtags" prefix="#" value={hashtags} onChange={setHashtags} placeholder="#atardecer" />
         <input value={locName} onChange={(e) => setLocName(e.target.value)} placeholder="Lugar (p. ej. Plaza de Armas, Cusco)" className={input} />
         <input type="url" value={mapsUrl} onChange={(e) => setMapsUrl(e.target.value)} placeholder="Enlace de Google Maps (opcional)" className={input} />
+        {/* Selector segmentado: radios nativos (teclado y lectores de pantalla) con estilo de botones */}
+        <fieldset className="flex flex-col gap-1 text-sm">
+          <legend className="mb-1 font-medium">Dispositivo</legend>
+          <div className="flex rounded-lg border border-stone-300 p-1 dark:border-stone-700">
+            {DEVICE_OPTIONS.map((opt) => (
+              <label key={opt.label}
+                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-stone-600 transition has-checked:bg-stone-900 has-checked:text-white has-focus-visible:outline-2 has-focus-visible:outline-offset-2 dark:text-stone-300 dark:has-checked:bg-stone-100 dark:has-checked:text-stone-900">
+                <input type="radio" name="device" className="sr-only"
+                  checked={device === opt.value} onChange={() => setDevice(opt.value)} />
+                {opt.value && <DeviceIcon device={opt.value} decorative className="size-4" />}
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium">Fecha</span>
           <input type="datetime-local" required value={date} onChange={(e) => setDate(e.target.value)} className={input} />

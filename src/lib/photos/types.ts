@@ -7,6 +7,13 @@ export interface PhotoLocation {
   lng?: number;
 }
 
+/** Dispositivo con el que se tomó la foto. */
+export const PHOTO_DEVICES = ['iphone', 'camera'] as const;
+export type PhotoDevice = (typeof PHOTO_DEVICES)[number];
+
+export const DEVICE_LABEL: Record<PhotoDevice, string> = { iphone: 'iPhone', camera: 'Cámara' };
+export const DEVICE_A11Y: Record<PhotoDevice, string> = { iphone: 'Tomada con iPhone', camera: 'Tomada con cámara' };
+
 export interface PhotoDoc {
   _id: ObjectId;
   title: string;
@@ -15,6 +22,7 @@ export interface PhotoDoc {
   tags: string[];
   hashtags: string[];
   location: PhotoLocation | null;
+  device?: PhotoDevice | null;   // opcional: las publicaciones anteriores no lo tienen
   imageUrl: string;
   publicId: string;
   width: number;
@@ -27,18 +35,20 @@ export interface PhotoDoc {
 }
 
 /** Forma serializable que viaja al cliente (props de islas y JSON de la API). */
-export interface PhotoDTO extends Omit<PhotoDoc, '_id' | 'createdAt' | 'updatedAt'> {
+export interface PhotoDTO extends Omit<PhotoDoc, '_id' | 'device' | 'createdAt' | 'updatedAt'> {
   id: string;
+  device: PhotoDevice | null;
   createdAt: string;
   updatedAt: string;
   likedByMe?: boolean;
 }
 
 export function toDTO(doc: WithId<PhotoDoc> | PhotoDoc, likedByMe?: boolean): PhotoDTO {
-  const { _id, createdAt, updatedAt, ...rest } = doc;
+  const { _id, createdAt, updatedAt, device, ...rest } = doc;
   return {
     ...rest,
     id: _id.toHexString(),
+    device: device ?? null,
     createdAt: createdAt.toISOString(),
     updatedAt: updatedAt.toISOString(),
     ...(likedByMe === undefined ? {} : { likedByMe }),

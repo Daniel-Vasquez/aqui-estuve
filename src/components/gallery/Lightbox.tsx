@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PhotoDTO } from '@/lib/photos/types';
 import { downloadUrl, lightboxUrl, thumbUrl } from '@/lib/cloudinary-url';
 import Modal from '@/components/ui/Modal';
+import DeviceIcon from '@/components/icons/DeviceIcon';
 import LikeButton from './LikeButton';
 import LocationLink from './LocationLink';
 
@@ -60,6 +61,12 @@ export default function Lightbox({ photo, liked, onClose, onPrev, onNext, onLike
               onLoad={() => setLoadedId(photo.id)}
               className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             />
+            {/* Arriba a la izquierda: no choca con las flechas (centro vertical) ni con el cierre (panel) */}
+            {photo.device && (
+              <span className="pointer-events-none absolute top-3 left-3 rounded-full bg-black/50 p-2 text-white backdrop-blur-sm">
+                <DeviceIcon device={photo.device} className="size-4" />
+              </span>
+            )}
             {onPrev && <button type="button" onClick={onPrev} aria-label="Anterior" className="absolute top-1/2 left-2 -translate-y-1/2 rounded-full bg-black/50 px-3 py-2 text-white">‹</button>}
             {onNext && <button type="button" onClick={onNext} aria-label="Siguiente" className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-black/50 px-3 py-2 text-white">›</button>}
           </div>

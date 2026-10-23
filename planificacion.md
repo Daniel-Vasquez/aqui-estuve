@@ -2618,6 +2618,8 @@ npm run build      # astro check + astro build → .vercel/output/
 
 **Dispositivo de captura (`device`)**: selector segmentado *Sin indicar / iPhone / Cámara* en `PhotoForm`; icono SVG inline (`src/components/icons/DeviceIcon.tsx`, con `aria-label` + `<title>`) junto al nombre en `PhotoCard` (misma capa → misma aparición en hover) y en el lightbox arriba a la izquierda de la imagen (fuera del panel de información). Sin migración: los documentos sin el campo se leen como `null` en `toDTO` y no muestran icono.
 
+**Feed en mobile (< `md`, 768 px)**: la galería es una columna; cada `PhotoCard` muestra, en orden, cabecera (título + icono de dispositivo), imagen, acciones (❤ `LikeButton` + descarga con `DownloadIcon`), ubicación, descripción, hashtags y pie (fecha · `ancho × alto px`); las etiquetas no se muestran. En mobile la imagen no abre el lightbox (`pointer-events-none md:pointer-events-auto` + guarda `isDesktop()` de `src/lib/media.ts`) y un enlace `/?foto=<id>` hace scroll a la tarjeta. El estado de likes vive solo en `Gallery` y se comparte con tarjetas y lightbox. Formato de fecha/dimensiones en `src/lib/format.ts`. Desktop sin cambios.
+
 ## Anexo B — Mejoras futuras (fuera de alcance)
 - Leer la fecha EXIF (`DateTimeOriginal`) subiendo con `media_metadata: true` y usarla como `createdAt` por defecto.
 - Página permanente `/foto/[slug]` para SEO por fotografía.

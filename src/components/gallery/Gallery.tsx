@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { PhotoDTO } from '@/lib/photos/types';
 import { fetchPhotos } from '@/lib/api-client';
 import { useLikedPhotos } from '@/hooks/useLikedPhotos';
+import { isDesktop } from '@/lib/media';
 import PhotoCard from './PhotoCard';
 import Lightbox from './Lightbox';
 
@@ -23,6 +24,13 @@ export default function Gallery({ initialPhotos, initialCursor, initialOpenId = 
     list.forEach((p) => p.likedByMe !== undefined && setLike(p.id, p.likedByMe));
   }, [setLike]);
   useEffect(() => { syncFromServer(initialPhotos); }, [initialPhotos, syncFromServer]);
+
+  // Enlace compartido abierto en mobile: no hay lightbox → se desplaza hasta la tarjeta.
+  useEffect(() => {
+    if (!initialOpenId || isDesktop()) return;
+    setOpenId(null);
+    document.getElementById(`foto-${initialOpenId}`)?.scrollIntoView({ block: 'start' });
+  }, [initialOpenId]);
 
   // URL compartible: /?foto=<id>
   useEffect(() => {
@@ -58,9 +66,10 @@ export default function Gallery({ initialPhotos, initialCursor, initialOpenId = 
 
   return (
     <>
-      <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
+      <div className="columns-1 gap-4 md:columns-2 lg:columns-3">
         {photos.map((p, i) => (
-          <PhotoCard key={p.id} photo={p} eager={i < 6} onOpen={() => setOpenId(p.id)} />
+          <PhotoCard key={p.id} photo={p} eager={i < 6} liked={liked.has(p.id)}
+            onOpen={() => setOpenId(p.id)} onLikeChange={onLikeChange} />
         ))}
       </div>
 

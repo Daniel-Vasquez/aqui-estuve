@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PhotoDTO } from '@/lib/photos/types';
 import { downloadUrl, lightboxUrl, thumbUrl } from '@/lib/cloudinary-url';
+import { formatPhotoDate } from '@/lib/format';
 import Modal from '@/components/ui/Modal';
 import DeviceIcon from '@/components/icons/DeviceIcon';
 import LikeButton from './LikeButton';
@@ -77,7 +78,7 @@ export default function Lightbox({ photo, liked, onClose, onPrev, onNext, onLike
               <button type="button" onClick={onClose} aria-label="Cerrar" className="text-2xl leading-none">×</button>
             </div>
             <time dateTime={photo.createdAt} className="text-sm text-stone-500">
-              {new Date(photo.createdAt).toLocaleDateString('es', { dateStyle: 'long' })}
+              {formatPhotoDate(photo.createdAt)}
             </time>
             {photo.location && <LocationLink location={photo.location} />}
             {photo.description && <p className="whitespace-pre-line leading-relaxed text-stone-700 dark:text-stone-300">{photo.description}</p>}

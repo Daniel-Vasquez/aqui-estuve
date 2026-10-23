@@ -2518,6 +2518,8 @@ Proyecto en producción en Vercel desde la rama `main`: página 404, cabeceras d
 ### 2. Variables de Entorno Requeridas (Acción del Usuario)
 En Vercel → *Project* → **Settings → Environment Variables**, definir para el entorno *Production* **todas** las variables de `.env.example` con valores de producción:
 - `SITE_URL` y `BETTER_AUTH_URL` = `https://tu-dominio.com` o `https://<proyecto>.vercel.app` (idénticas, sin barra final). Si cambias de dominio, actualiza ambas y vuelve a desplegar.
+  - ⚠ Deben empezar por **`https://`**. Con `http://`, el navegador envía `Origin: https://…` y Better Auth rechaza el login con **403 `INVALID_ORIGIN`** (nos pasó en el primer despliegue). Síntoma adicional: el `<link rel="canonical">` de la portada sale con `http://`.
+  - El login solo funciona desde el dominio de `BETTER_AUTH_URL`: entrar siempre por el dominio propio, no por `….vercel.app`.
 - `TRUST_PROXY=true`.
 - `MONGODB_URI`: Vercel no tiene IPs de salida fijas en el plan gratuito → en Atlas → *Network Access* añadir `0.0.0.0/0` (la protección es la contraseña del usuario de BD; usa una larga y un usuario con permisos solo sobre `aqui_estuve`).
 - **No** subir `ADMIN_PASSWORD` a Vercel: el seed se ejecuta una vez desde local apuntando a la BD de producción.
@@ -2589,6 +2591,7 @@ npm run build      # astro check + astro build → .vercel/output/
 - [ ] Un like desde el móvil (datos) y otro desde el ordenador (wifi) cuentan como 2; repetir desde el mismo dispositivo lo quita.
 - [ ] Una ruta inexistente muestra la página 404 personalizada.
 - [ ] `curl -I https://<dominio>/` muestra `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`.
+- [ ] Login con credenciales falsas → **401** (no 403). Si da 403 `INVALID_ORIGIN`, revisar `https://` en `BETTER_AUTH_URL`.
 - [ ] En producción: la cookie de sesión lleva el atributo **Secure** y el prefijo `__Secure-`.
 - [ ] Compartir `https://tu-dominio.com/?foto=<id>` en un validador de Open Graph muestra la imagen 1200×630.
 - [ ] Lighthouse (móvil) en `/`: Performance ≥ 90, Accessibility ≥ 95.

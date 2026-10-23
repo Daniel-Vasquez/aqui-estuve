@@ -1,0 +1,50 @@
+---
+import '@/styles/global.css';
+import ThemeToggle from '@/components/ThemeToggle';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+}
+const {
+  title = 'Aquí Estuve',
+  description = 'Fotografías de los lugares donde estuve.',
+  image,
+} = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script is:inline>
+      (() => {
+        let stored = null;
+        try { stored = localStorage.getItem('theme'); } catch {}
+        const dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+        const root = document.documentElement;
+        root.classList.toggle('dark', dark);
+        root.style.colorScheme = dark ? 'dark' : 'light';
+      })();
+    </script>
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    {image && <meta property="og:image" content={image} />}
+    <slot name="head" />
+  </head>
+  <body class="min-h-dvh font-sans">
+    <header class="mx-auto flex max-w-7xl items-center justify-between px-4 py-6">
+      <a href="/" class="font-serif text-2xl tracking-tight">Aquí Estuve</a>
+      <ThemeToggle client:load />
+    </header>
+    <main class="mx-auto max-w-7xl px-4 pb-16">
+      <slot />
+    </main>
+  </body>
+</html>

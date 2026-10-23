@@ -1,13 +1,24 @@
-import type { PhotoDTO } from '@/lib/photos/types';
+import { DEVICE_A11Y, DEVICE_LABEL, type PhotoDTO } from '@/lib/photos/types';
 import { thumbUrl } from '@/lib/cloudinary-url';
+import DeviceIcon from '@/components/icons/DeviceIcon';
 
 export default function AdminPhotoCard({ photo, onEdit, onDelete }: {
   photo: PhotoDTO; onEdit: () => void; onDelete: () => void;
 }) {
   return (
     <article className="group overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800">
-      <img src={thumbUrl(photo.imageUrl, 500)} alt={photo.title} width={photo.width} height={photo.height}
-        loading="lazy" className="aspect-[4/3] w-full object-cover" />
+      <div className="relative">
+        <img src={thumbUrl(photo.imageUrl, 500)} alt={photo.title} width={photo.width} height={photo.height}
+          loading="lazy" className="aspect-[4/3] w-full object-cover" />
+        {/* Siempre visible (sin hover). Sin pointer-events-none para que el title muestre su tooltip;
+            no tapa controles: Editar/Eliminar están debajo de la imagen. */}
+        {photo.device && (
+          <span role="img" aria-label={DEVICE_A11Y[photo.device]} title={DEVICE_LABEL[photo.device]}
+            className="absolute top-2.5 left-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white shadow-sm backdrop-blur-sm">
+            <DeviceIcon device={photo.device} decorative className="size-4" />
+          </span>
+        )}
+      </div>
       <div className="flex items-start justify-between gap-2 p-3">
         <div className="min-w-0">
           <h3 className="truncate font-medium">{photo.title}</h3>

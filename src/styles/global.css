@@ -20,3 +20,9 @@
   html { @apply bg-stone-50 text-stone-900 antialiased; scrollbar-gutter: stable; }
   html.dark { @apply bg-stone-950 text-stone-100; }
 }
+
+/* Carrusel móvil: desplazamiento horizontal sin barra visible */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}

@@ -6,6 +6,13 @@ async function main() {
     { key: { createdAt: -1, _id: -1 }, name: 'createdAt_desc' },
     { key: { slug: 1 }, name: 'slug_unique', unique: true },
     { key: { publicId: 1 }, name: 'publicId_unique', unique: true },
+    // Cada imagen pertenece a una sola publicación (parcial: los documentos antiguos no tienen `images`).
+    {
+      key: { 'images.publicId': 1 },
+      name: 'images_publicId_unique',
+      unique: true,
+      partialFilterExpression: { 'images.publicId': { $exists: true } },
+    },
     { key: { tags: 1 }, name: 'tags' },
     { key: { hashtags: 1 }, name: 'hashtags' },
     { key: { categories: 1, createdAt: -1, _id: -1 }, name: 'categories_createdAt' },

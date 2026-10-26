@@ -179,8 +179,6 @@ export default function Gallery({ initialPhotos, initialCursor, initialOpenId = 
         photo={current}
         liked={current ? liked.has(current.id) : false}
         onClose={() => setOpenId(null)}
-        onPrev={index > 0 ? () => setOpenId(photos[index - 1].id) : undefined}
-        onNext={index >= 0 && index < photos.length - 1 ? () => setOpenId(photos[index + 1].id) : undefined}
         onLikeChange={onLikeChange}
       />
     </>

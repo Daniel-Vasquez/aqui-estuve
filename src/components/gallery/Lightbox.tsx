@@ -12,55 +12,79 @@ interface Props {
   photo: PhotoDTO | null;
   liked: boolean;
   onClose: () => void;
-  onPrev?: () => void;
-  onNext?: () => void;
   onLikeChange: (id: string, s: { liked: boolean; likesCount: number }) => void;
 }
 
-export default function Lightbox({ photo, liked, onClose, onPrev, onNext, onLikeChange }: Props) {
-  // id de la foto cuya imagen grande ya terminó de cargar (se reinicia sola al cambiar de foto).
-  const [loadedId, setLoadedId] = useState<string | null>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const loaded = photo !== null && loadedId === photo.id;
+const ARROW = 'absolute top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/40 p-2 text-white backdrop-blur-sm transition hover:bg-black/60 focus-visible:outline-2 focus-visible:outline-white md:flex';
 
+function Chevron({ dir }: { dir: 'left' | 'right' }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}
+      strokeLinecap="round" strokeLinejoin="round" className="size-5">
+      <path d={dir === 'left' ? 'm15 6-6 6 6 6' : 'm9 6 6 6-6 6'} />
+    </svg>
+  );
+}
+
+/** Muestra SOLO la publicación seleccionada: las flechas/teclado recorren sus fotos, nunca cambian de publicación. */
+export default function Lightbox({ photo, liked, onClose, onLikeChange }: Props) {
+  const images = photo?.images ?? [];
+  const multi = images.length > 1;
+  const [imageIndex, setImageIndex] = useState(0);
+  const index = Math.min(imageIndex, Math.max(images.length - 1, 0));
+  const current = images[index];
+
+  // Cada publicación abre en su primera foto.
+  useEffect(() => { setImageIndex(0); }, [photo?.id]);
+
+  // public_id de la imagen grande ya cargada (para el fundido sobre la miniatura).
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const loaded = current !== undefined && loadedKey === current.publicId;
+
+  // Solo con varias fotos; en la primera no hay "anterior" y en la última no hay "siguiente".
+  const goPrev = multi && index > 0 ? () => setImageIndex(index - 1) : undefined;
+  const goNext = multi && index < images.length - 1 ? () => setImageIndex(index + 1) : undefined;
+
+  // Teclado: sin efecto en publicaciones de 1 foto (no se registra el listener).
   useEffect(() => {
-    if (!photo) return;
+    if (!photo || !multi) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') onPrev?.();
-      if (e.key === 'ArrowRight') onNext?.();
+      if (e.key === 'ArrowLeft') goPrev?.();
+      if (e.key === 'ArrowRight') goNext?.();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [photo, onPrev, onNext]);
+  }, [photo, multi, goPrev, goNext]);
 
   // Si la imagen ya estaba en caché puede completarse antes de enlazar onLoad.
   useEffect(() => {
-    if (photo && imgRef.current?.complete) setLoadedId(photo.id);
-  }, [photo]);
+    if (current && imgRef.current?.complete) setLoadedKey(current.publicId);
+  }, [current]);
 
   return (
     <Modal open={photo !== null} onClose={onClose} labelledBy="lightbox-title" className="max-h-dvh max-w-[100vw]">
-      {photo && (
+      {photo && current && (
         // Dimensiones FIJAS desde el primer frame: no dependen de la imagen ni de su carga.
         // Móvil: filas 55dvh (imagen) + resto (info con scroll). Escritorio: columnas 1fr + 380px.
         <div className="grid h-[92dvh] w-[min(1400px,96vw)] grid-rows-[55dvh_minmax(0,1fr)] overflow-hidden rounded-2xl bg-white text-stone-900 lg:h-[90dvh] lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-1 dark:bg-stone-900 dark:text-stone-100">
           <div className="relative min-h-0 bg-black">
             {/* Provisional: miniatura (normalmente en caché por la galería) */}
             <img
-              key={`thumb-${photo.id}`}
-              src={thumbUrl(photo.imageUrl, 800)}
+              key={`thumb-${current.publicId}`}
+              src={thumbUrl(current.imageUrl, 800)}
               alt=""
               aria-hidden
               className="absolute inset-0 h-full w-full object-contain"
             />
             <img
-              key={photo.id}
+              key={current.publicId}
               ref={imgRef}
-              src={lightboxUrl(photo.imageUrl)}
-              alt={photo.title}
-              width={photo.width}
-              height={photo.height}
-              onLoad={() => setLoadedId(photo.id)}
+              src={lightboxUrl(current.imageUrl)}
+              alt={multi ? `${photo.title} (${index + 1} de ${images.length})` : photo.title}
+              width={current.width}
+              height={current.height}
+              onLoad={() => setLoadedKey(current.publicId)}
               className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             />
             {/* Arriba a la izquierda: no choca con las flechas (centro vertical) ni con el cierre (panel) */}
@@ -69,8 +93,25 @@ export default function Lightbox({ photo, liked, onClose, onPrev, onNext, onLike
                 <DeviceIcon device={photo.device} className="size-4" />
               </span>
             )}
-            {onPrev && <button type="button" onClick={onPrev} aria-label="Anterior" className="absolute top-1/2 left-2 -translate-y-1/2 rounded-full bg-black/50 px-3 py-2 text-white">‹</button>}
-            {onNext && <button type="button" onClick={onNext} aria-label="Siguiente" className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-black/50 px-3 py-2 text-white">›</button>}
+            {/* Posición dentro de la publicación (solo con varias fotos) */}
+            {multi && (
+              <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-black/50 px-2.5 py-1 text-xs text-white tabular-nums backdrop-blur-sm"
+                aria-live="polite">
+                {index + 1} / {images.length}
+              </span>
+            )}
+            {goPrev && (
+              <button type="button" onClick={goPrev} className={`${ARROW} left-3`}
+                aria-label="Foto anterior">
+                <Chevron dir="left" />
+              </button>
+            )}
+            {goNext && (
+              <button type="button" onClick={goNext} className={`${ARROW} right-3`}
+                aria-label="Foto siguiente">
+                <Chevron dir="right" />
+              </button>
+            )}
           </div>
 
           <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto p-6">
@@ -94,8 +135,11 @@ export default function Lightbox({ photo, liked, onClose, onPrev, onNext, onLike
             <div className="mt-auto flex flex-wrap items-center gap-5 pt-4">
               <LikeButton photoId={photo.id} count={photo.likesCount} liked={liked}
                 onChange={(s) => onLikeChange(photo.id, s)} />
-              <DownloadButton imageUrl={photo.imageUrl} title={photo.title} />
-              <span className="text-xs text-stone-500">{photo.width}×{photo.height} · {photo.format.toUpperCase()}</span>
+              {/* Descarga y dimensiones siguen a la foto que se está viendo */}
+              <DownloadButton imageUrl={current.imageUrl} title={multi ? `${photo.title} ${index + 1}` : photo.title} />
+              <span className="text-xs text-stone-500 tabular-nums">
+                {current.width}×{current.height}{(current.format ?? photo.format) ? ` · ${(current.format ?? photo.format).toUpperCase()}` : ''}
+              </span>
             </div>
           </aside>
         </div>

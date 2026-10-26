@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PHOTO_DEVICES } from './types';
+import { MAX_IMAGES_PER_POST, PHOTO_DEVICES } from './types';
 import {
   ALL_CATEGORIES_LABEL,
   CATEGORY_MAX_LENGTH,
@@ -43,6 +43,17 @@ export const locationSchema = z
     message: 'lat y lng deben indicarse juntas',
   });
 
+// Lista ORDENADA de public_ids (la primera es la portada), sin duplicados, 1–5.
+const publicIds = z
+  .array(z.string().trim().min(1).max(255))
+  .transform((ids) => [...new Set(ids)])
+  .pipe(
+    z
+      .array(z.string())
+      .min(1, { message: 'Sube al menos una foto' })
+      .max(MAX_IMAGES_PER_POST, { message: `Máximo ${MAX_IMAGES_PER_POST} fotos por publicación` }),
+  );
+
 const base = {
   title: z.string().trim().min(1).max(140),
   description: z.string().trim().max(5000),
@@ -69,7 +80,7 @@ const base = {
 };
 
 export const photoCreateSchema = z.object({
-  publicId: z.string().trim().min(1).max(255),  // devuelto por Cloudinary tras la subida directa
+  publicIds,                                   // devueltos por Cloudinary tras la subida directa
   title: base.title,
   description: base.description.default(''),
   tags: base.tags.default([]),
@@ -80,10 +91,14 @@ export const photoCreateSchema = z.object({
   createdAt: base.createdAt.optional(),        // si falta → ahora
 });
 
+// En edición, `publicIds` (opcional) es la lista final: conservadas + nuevas, en orden.
 export const photoUpdateSchema = z
-  .object(base)
+  .object({ ...base, publicIds })
   .partial()
   .refine((o) => Object.keys(o).length > 0, { message: 'Nada que actualizar' });
 
 export type PhotoCreateInput = z.infer<typeof photoCreateSchema>;
 export type PhotoUpdateInput = z.infer<typeof photoUpdateSchema>;
+/** Metadatos sin la lista de imágenes (las imágenes se resuelven aparte). */
+export type PhotoCreateMeta = Omit<PhotoCreateInput, 'publicIds'>;
+export type PhotoUpdateMeta = Omit<PhotoUpdateInput, 'publicIds'>;

@@ -1,10 +1,10 @@
-import { useEffect, useState, type SubmitEvent } from 'react';
+import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { DEVICE_LABEL, PHOTO_DEVICES, type PhotoDevice, type PhotoDTO } from '@/lib/photos/types';
-import { ApiError, createPhoto, updatePhoto, type PhotoMetadata } from '@/lib/api-client';
-import { thumbUrl } from '@/lib/cloudinary-url';
+import { ApiError, createPhoto, discardUploads, updatePhoto, uploadImages, type PhotoMetadata } from '@/lib/api-client';
 import DeviceIcon from '@/components/icons/DeviceIcon';
 import TagInput from './TagInput';
 import CategoryPicker from './CategoryPicker';
+import ImagesField, { type ImageItem } from './ImagesField';
 
 const DEVICE_OPTIONS: { value: PhotoDevice | null; label: string }[] = [
   { value: null, label: 'Sin indicar' },
@@ -27,8 +27,9 @@ function toLocalInput(iso: string) {
 
 export default function PhotoForm({ photo, categories, maxBytes, onSaved, onCancel }: Props) {
   const editing = Boolean(photo);
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(photo ? thumbUrl(photo.imageUrl, 800) : null);
+  const [items, setItems] = useState<ImageItem[]>(
+    () => photo?.images.map((asset) => ({ key: asset.publicId, kind: 'existing' as const, asset })) ?? [],
+  );
   const [title, setTitle] = useState(photo?.title ?? '');
   const [description, setDescription] = useState(photo?.description ?? '');
   const [tags, setTags] = useState<string[]>(photo?.tags ?? []);
@@ -42,19 +43,15 @@ export default function PhotoForm({ photo, categories, maxBytes, onSaved, onCanc
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Libera la URL de objeto de la vista previa local.
-  useEffect(() => () => { if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview); }, [preview]);
-
-  function pickFile(f: File | undefined) {
-    if (!f) return;
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
-  }
+  // Al cerrar el formulario se liberan las vistas previas locales (blob:) que queden.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  useEffect(() => () => itemsRef.current.forEach((i) => { if (i.kind === 'new') URL.revokeObjectURL(i.preview); }), []);
 
   async function onSubmit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    if (!editing && !file) return setError('Selecciona una imagen');
+    if (items.length === 0) return setError('Añade al menos una foto');
     if (selectedCategories.length === 0) return setError('Elige al menos una categoría');
 
     const metadata: PhotoMetadata = {
@@ -69,12 +66,21 @@ export default function PhotoForm({ photo, categories, maxBytes, onSaved, onCanc
     };
 
     setSaving(true);
+    let uploaded: string[] = [];
     try {
+      // 1) Solo las nuevas se suben (en paralelo, directo a Cloudinary).
+      const pending = items.filter((i): i is Extract<ImageItem, { kind: 'new' }> => i.kind === 'new');
+      uploaded = await uploadImages(pending.map((i) => i.file), { maxBytes, onProgress: setProgress });
+      const idByKey = new Map(pending.map((item, n) => [item.key, uploaded[n]]));
+      // 2) Lista final en el orden elegido (la primera es la portada).
+      const publicIds = items.map((i) => (i.kind === 'existing' ? i.asset.publicId : idByKey.get(i.key)!));
+
       const saved = editing
-        ? await updatePhoto(photo!.id, metadata)
-        : await createPhoto(file!, metadata, { maxBytes, onProgress: setProgress });
+        ? await updatePhoto(photo!.id, { ...metadata, publicIds })
+        : await createPhoto(publicIds, metadata);
       onSaved(saved);
     } catch (err) {
+      await discardUploads(uploaded);   // si el guardado falló, no dejar subidas huérfanas
       setError(err instanceof ApiError ? err.message : 'Error inesperado');
     } finally {
       setSaving(false);
@@ -87,22 +93,8 @@ export default function PhotoForm({ photo, categories, maxBytes, onSaved, onCanc
   return (
     <form onSubmit={onSubmit}
       className="grid w-[min(960px,95vw)] gap-6 rounded-2xl bg-white p-6 text-stone-900 md:grid-cols-2 dark:bg-stone-900 dark:text-stone-100">
-      {/* Columna imagen */}
-      <div
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => { e.preventDefault(); if (!editing) pickFile(e.dataTransfer.files[0]); }}
-        className="flex min-h-64 items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-stone-300 dark:border-stone-700"
-      >
-        {preview ? (
-          <img src={preview} alt="Vista previa" className="max-h-[60vh] w-full object-contain" />
-        ) : (
-          <label className="cursor-pointer p-8 text-center text-sm text-stone-500">
-            Arrastra una foto o <span className="underline">elige un archivo</span>
-            <input type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif"
-              className="sr-only" onChange={(e) => pickFile(e.target.files?.[0])} />
-          </label>
-        )}
-      </div>
+      {/* Columna fotos (1–5) */}
+      <ImagesField items={items} onChange={setItems} maxBytes={maxBytes} />
 
       {/* Columna metadatos */}
       <div className="flex flex-col gap-4">

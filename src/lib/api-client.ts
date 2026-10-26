@@ -30,8 +30,8 @@ interface UploadSignature {
   allowedFormats: string;
 }
 
-/** Sube el archivo DIRECTO a Cloudinary (XHR para tener progreso). Devuelve el public_id. */
-function uploadToCloudinary(file: File, sig: UploadSignature, onProgress?: (pct: number) => void) {
+/** Sube un archivo DIRECTO a Cloudinary (XHR para tener progreso). Devuelve el public_id. */
+function uploadToCloudinary(file: File, sig: UploadSignature, onBytes?: (loaded: number) => void) {
   return new Promise<string>((resolve, reject) => {
     const fd = new FormData();
     fd.append('file', file);
@@ -42,35 +42,67 @@ function uploadToCloudinary(file: File, sig: UploadSignature, onProgress?: (pct:
     fd.append('allowed_formats', sig.allowedFormats);
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`);
-    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(Math.round((e.loaded / e.total) * 100));
+    // e.total incluye la cabecera multipart: se reescala al tamaño del archivo.
+    xhr.upload.onprogress = (e) => e.lengthComputable && onBytes?.((e.loaded / e.total) * file.size);
     xhr.onload = () => {
       const data = (() => { try { return JSON.parse(xhr.responseText); } catch { return {}; } })();
       if (xhr.status >= 200 && xhr.status < 300 && data.public_id) resolve(data.public_id);
-      else reject(new ApiError(xhr.status, data.error?.message ?? 'Cloudinary rechazó la imagen'));
+      else reject(new ApiError(xhr.status, data.error?.message ?? `Cloudinary rechazó «${file.name}»`));
     };
     xhr.onerror = () => reject(new ApiError(0, 'Error de red subiendo a Cloudinary'));
     xhr.send(fd);
   });
 }
 
-/** Firma → sube a Cloudinary → registra en /api/photos. */
-export async function createPhoto(
-  file: File,
-  metadata: PhotoMetadata,
+/**
+ * Sube varias fotos EN PARALELO directo a Cloudinary con una sola firma y progreso combinado (0–100).
+ * Devuelve los public_id en el mismo orden. Si alguna falla, descarta las que sí subieron.
+ */
+export async function uploadImages(
+  files: File[],
   { maxBytes, onProgress }: { maxBytes: number; onProgress?: (pct: number) => void },
-) {
-  if (file.size > maxBytes) throw new ApiError(413, `La imagen supera ${Math.round(maxBytes / 1024 / 1024)} MB`);
+): Promise<string[]> {
+  if (!files.length) return [];
+  const tooBig = files.find((f) => f.size > maxBytes);
+  if (tooBig) throw new ApiError(413, `«${tooBig.name}» supera ${Math.round(maxBytes / 1024 / 1024)} MB`);
+
   const sig = await fetch('/api/admin/upload-signature', { method: 'POST' }).then((r) => handle<UploadSignature>(r));
-  const publicId = await uploadToCloudinary(file, sig, onProgress);
-  const { photo } = await fetch('/api/photos', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ publicId, ...metadata }),
-  }).then((r) => handle<{ photo: PhotoDTO }>(r));
-  return photo;
+  const total = files.reduce((n, f) => n + f.size, 0);
+  const loaded = files.map(() => 0);
+  const report = () => onProgress?.(Math.round((loaded.reduce((a, b) => a + b, 0) / total) * 100));
+
+  const results = await Promise.allSettled(
+    files.map((f, i) => uploadToCloudinary(f, sig, (bytes) => { loaded[i] = bytes; report(); })),
+  );
+  const ok = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+  const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (failed) {
+    await discardUploads(ok);
+    throw failed.reason;
+  }
+  return ok;
 }
 
-export const updatePhoto = (id: string, patch: Partial<PhotoMetadata>) =>
+/** Best effort: borra subidas que no llegaron a publicarse (el servidor solo borra huérfanas). */
+export async function discardUploads(publicIds: string[]) {
+  if (!publicIds.length) return;
+  await fetch('/api/admin/discard-uploads', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ publicIds }),
+  }).catch(() => {});
+}
+
+/** Registra la publicación con las imágenes ya subidas (la primera es la portada). */
+export const createPhoto = (publicIds: string[], metadata: PhotoMetadata) =>
+  fetch('/api/photos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ publicIds, ...metadata }),
+  }).then((r) => handle<{ photo: PhotoDTO }>(r)).then((d) => d.photo);
+
+/** publicIds (opcional) = lista final ordenada: conservadas + nuevas. */
+export const updatePhoto = (id: string, patch: Partial<PhotoMetadata> & { publicIds?: string[] }) =>
   fetch(`/api/photos/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

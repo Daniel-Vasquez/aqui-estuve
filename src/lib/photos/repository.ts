@@ -1,9 +1,8 @@
 import { ObjectId, type Filter } from 'mongodb';
-import type { CloudinaryImage } from '../cloudinary';
 import { db } from '../db';
 import { slugify } from '../slug';
-import { PHOTO_DEVICES, type PhotoDevice, type PhotoDoc } from './types';
-import type { PhotoCreateInput, PhotoUpdateInput } from './schema';
+import { PHOTO_DEVICES, type PhotoAsset, type PhotoDevice, type PhotoDoc } from './types';
+import type { PhotoCreateMeta, PhotoUpdateMeta } from './schema';
 
 export const photosCol = () => db.collection<PhotoDoc>('photos');
 
@@ -63,9 +62,26 @@ export const isPhotoDevice = (v: unknown): v is PhotoDevice =>
 
 export const getPhoto = (id: ObjectId) => photosCol().findOne({ _id: id });
 
-export const findByPublicId = (publicId: string) => photosCol().findOne({ publicId });
+/** public_ids de la lista que ya pertenecen a alguna publicación (opcionalmente excluyendo una). */
+export async function findUsedPublicIds(ids: string[], exclude?: ObjectId): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  const docs = await photosCol()
+    .find(
+      { $or: [{ publicId: { $in: ids } }, { 'images.publicId': { $in: ids } }], ...(exclude ? { _id: { $ne: exclude } } : {}) },
+      { projection: { publicId: 1, images: 1 } },
+    )
+    .toArray();
+  const wanted = new Set(ids);
+  return new Set(docs.flatMap((d) => [d.publicId, ...(d.images ?? []).map((i) => i.publicId)]).filter((p) => wanted.has(p)));
+}
 
-export async function createPhoto(input: PhotoCreateInput, image: CloudinaryImage): Promise<PhotoDoc> {
+/** Campos raíz de portada a partir de images[0] (compatibilidad con código y documentos antiguos). */
+const coverFields = (images: PhotoAsset[]) => {
+  const c = images[0];
+  return { imageUrl: c.imageUrl, publicId: c.publicId, width: c.width, height: c.height, format: c.format ?? '', bytes: c.bytes ?? 0 };
+};
+
+export async function createPhoto(input: PhotoCreateMeta, images: PhotoAsset[]): Promise<PhotoDoc> {
   const _id = new ObjectId();
   const now = new Date();
   const doc: PhotoDoc = {
@@ -78,12 +94,8 @@ export async function createPhoto(input: PhotoCreateInput, image: CloudinaryImag
     location: input.location,
     device: input.device,
     categories: input.categories,
-    imageUrl: image.secure_url,
-    publicId: image.public_id,
-    width: image.width,
-    height: image.height,
-    format: image.format,
-    bytes: image.bytes,
+    images,
+    ...coverFields(images),
     likesCount: 0,
     createdAt: input.createdAt ?? now,
     updatedAt: now,
@@ -92,8 +104,9 @@ export async function createPhoto(input: PhotoCreateInput, image: CloudinaryImag
   return doc;
 }
 
-export async function updatePhoto(id: ObjectId, input: PhotoUpdateInput) {
+export async function updatePhoto(id: ObjectId, input: PhotoUpdateMeta, images?: PhotoAsset[]) {
   const $set: Partial<PhotoDoc> = { ...input, updatedAt: new Date() };
+  if (images) Object.assign($set, { images, ...coverFields(images) });
   if (input.title) $set.slug = buildSlug(input.title, id);
   // Al guardar el array nuevo se retira el campo antiguo de una sola categoría.
   const update = input.categories ? { $set, $unset: { category: '' as const } } : { $set };

@@ -5,7 +5,7 @@ const BLOCK = 'animate-pulse bg-stone-200 dark:bg-stone-800';
 /** Tarjeta de carga: en mobile imita el feed (cabecera, imagen, acciones); en desktop solo la imagen. */
 export default function PhotoSkeleton({ index }: { index: number }) {
   return (
-    <div aria-hidden className="mb-12 break-inside-avoid md:mb-4">
+    <div aria-hidden className="mb-12 md:mb-4">
       <div className={`mb-3 h-5 w-2/3 rounded md:hidden ${BLOCK}`} />
       <div className={`w-full rounded-lg ${RATIOS[index % RATIOS.length]} ${BLOCK}`} />
       {/* Acciones sin caja: ❤ + contador y el icono de descarga */}

@@ -34,7 +34,7 @@ export default function PhotoCard({ photo, liked, eager, animate, animationDelay
   return (
     <article id={`foto-${photo.id}`}
       style={animate ? { animationDelay: `${animationDelay}ms` } : undefined}
-      className={`mb-12 break-inside-avoid scroll-mt-4 md:mb-4 ${animate ? 'animate-fade-up motion-reduce:animate-none' : ''}`}>
+      className={`mb-12 scroll-mt-4 md:mb-4 ${animate ? 'animate-fade-up motion-reduce:animate-none' : ''}`}>
       {/* 1. Cabecera (mobile): nombre + icono de dispositivo a su derecha */}
       <header className="mb-3 flex items-center justify-between gap-3 md:hidden">
         <h2 className="min-w-0 font-serif text-lg leading-tight">{photo.title}</h2>

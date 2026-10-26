@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEVICE_LABEL, type PhotoDevice, type PhotoDTO } from '@/lib/photos/types';
 import { fetchPhotos } from '@/lib/api-client';
 import { useLikedPhotos } from '@/hooks/useLikedPhotos';
+import { useGridColumns } from '@/hooks/useGridColumns';
 import { isDesktop } from '@/lib/media';
 import PhotoCard from './PhotoCard';
 import PhotoSkeleton from './PhotoSkeleton';
+import MasonryGrid from './MasonryGrid';
 import FilterSelect from './FilterSelect';
 import Lightbox from './Lightbox';
 
@@ -36,6 +38,7 @@ export default function Gallery({ initialPhotos, initialCursor, initialOpenId = 
   const [generation, setGeneration] = useState(0);         // >0 ⇒ las fotos vienen de un filtro → animar entrada
   const [openId, setOpenId] = useState<string | null>(initialOpenId);
   const { liked, setLike } = useLikedPhotos();
+  const columns = useGridColumns();
   const filterRequest = useRef<AbortController | null>(null);
 
   // Reconciliar localStorage con lo que dice el servidor.
@@ -130,9 +133,11 @@ export default function Gallery({ initialPhotos, initialCursor, initialOpenId = 
       </div>
 
       {filtering ? (
-        <div aria-busy="true" className="columns-1 gap-4 md:columns-2 lg:columns-3">
+        <div aria-busy="true">
           <span className="sr-only" role="status">Cargando fotos…</span>
-          {Array.from({ length: SKELETONS }, (_, i) => <PhotoSkeleton key={i} index={i} />)}
+          {/* Misma estructura de columnas que el grid real */}
+          <MasonryGrid items={Array.from({ length: SKELETONS }, (_, i) => i)} columns={columns}
+            getKey={(i) => i} render={(i) => <PhotoSkeleton index={i} />} />
         </div>
       ) : filterError ? (
         <div className="py-24 text-center text-sm text-stone-500">
@@ -157,13 +162,12 @@ export default function Gallery({ initialPhotos, initialCursor, initialOpenId = 
         )
       ) : (
         // key = generation: al filtrar se remonta el grid y cada tarjeta entra con su animación.
-        <div key={generation} className="columns-1 gap-4 md:columns-2 lg:columns-3">
-          {photos.map((p, i) => (
-            <PhotoCard key={p.id} photo={p} eager={i < 6} liked={liked.has(p.id)}
+        <MasonryGrid key={generation} items={photos} columns={columns} getKey={(p) => p.id}
+          render={(p, i) => (
+            <PhotoCard photo={p} eager={i < 6} liked={liked.has(p.id)}
               animate={generation > 0} animationDelay={Math.min(i, 8) * 40}
               onOpen={() => setOpenId(p.id)} onLikeChange={onLikeChange} />
-          ))}
-        </div>
+          )} />
       )}
 
       {cursor && !filtering && !filterError && (
